@@ -1,0 +1,42 @@
+type: map
+mapping:
+  "version":
+    type: float
+    required: true
+    assert: val == 0.2
+  "env":
+    type: map
+    mapping:
+      "variables":
+        type: map
+        required: true
+        mapping:
+          =:
+            type: str
+  "phases":
+    type: map
+    required: true
+    mapping:
+      "install": &phase
+        type: map
+        mapping:
+          "commands":
+            required: true
+            type: seq
+            sequence:
+              - type: str
+      "pre_build": *phase
+      "build": *phase
+      "post_build": *phase
+  "artifacts":
+    type: map
+    mapping:
+      "files":
+        required: true
+        type: seq
+        sequence:
+          - type: str
+      "discard-paths":
+        type: bool
+      "base-directory":
+        type: str

@@ -1,5 +1,5 @@
-require "code_build_local/version"
-
-module CodeBuildLocal
-  # Your code goes here...
-end
+require 'code_build_local/build_spec/build_spec'
+require 'code_build_local/default_images'
+require 'code_build_local/runner'
+require 'code_build_local/source_provider'
+require 'code_build_local/version'
