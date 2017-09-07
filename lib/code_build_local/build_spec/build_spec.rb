@@ -2,37 +2,43 @@ require 'kwalify'
 
 module CodeBuildLocal
   module BuildSpec
-    ##
+
     # Error for communicating issues with buildspec
-    #
-    # has instance variable @filename, for the filename of the buildspec that caused the error
-    #
+
     class BuildSpecError < StandardError
+
+      # @!attribute [r] filename
+      #   @return [String] the filename of the buildspec that caused the error
+
+      attr_accessor :filename
+
       def initialize(message, filename)
         @filename = filename
         super(message)
       end
     end
     
-    ##
-    # Class for storing information on a buildspec
-    #
-    # Parse a buildspec.yml file with BuildSpec.new('your_filename')
-    # Retrieve the env with BuildSpec#env and the phases with Buildspec#phases
-    class BuildSpec
-      def env
-        @env
-      end
+    # Class for representing a buildspec defined by a buildspec file.
 
-      def phases
-        @phases
-      end
+    class BuildSpec
+
+      # @!attribute [r] env
+      #   @return [Map<String, String>] A mapping of environment variable names to values.
+      # @!attribute [r] phases
+      #   @return [Map<String, Array<String>>] A mapping of phase name to a list of commands
+      #   for that phase
+
+      attr_accessor :env, :phases
+
+      # Parse a buildspec file to create a BuildSpec object. Parses the file according to a
+      # buildspec schema.
 
       def initialize filename
         parse_file filename
       end
 
       private
+
       def parse_file filename
         schema_filename = File.join(File.dirname(__FILE__), './buildspec_schema.yml')
         schema = Kwalify::Yaml.load_file(schema_filename)
