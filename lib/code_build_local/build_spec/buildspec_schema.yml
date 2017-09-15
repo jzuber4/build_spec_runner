@@ -12,7 +12,7 @@ mapping:
         required: true
         mapping:
           =:
-            type: str
+            type: text
   "phases":
     type: map
     required: true
@@ -21,10 +21,10 @@ mapping:
         type: map
         mapping:
           "commands":
-            required: true
             type: seq
+            required: true
             sequence:
-              - type: str
+              - type: text
       "pre_build": *phase
       "build": *phase
       "post_build": *phase
@@ -32,11 +32,12 @@ mapping:
     type: map
     mapping:
       "files":
-        required: true
         type: seq
+        required: true
         sequence:
-          - type: str
+          - type: text
+            required: true
       "discard-paths":
         type: bool
       "base-directory":
-        type: str
+        type: text

@@ -16,7 +16,29 @@ module CodeBuildLocal
   #   default Ruby 2.3.1 image
   # @see Runner#run run - a more configurable way of running CodeBuild projects locally
 
-  module Runner
+  class Runner
+
+    # @!attribute [r] outstream
+    #   @return [StringIO, nil] the output stream for the redirected stdout of the CodeBuild project, or nil if none was specified.
+    # @!attribute [r] errstream
+    #   @return [StringIO, nil] the output stream for the redirected stderr of the CodeBuild project, or nil if none was specified.
+    # @!attribute [r] dbgstream
+    #   @return [StringIO, nil] the output stream for redirected debug messages, or nil if none was specified.
+    attr_accessor :outstream, :errstream, :dbgstream
+
+    # Create a Runner instance.
+    #
+    # @param opts [Hash] A hash containing several optional values,
+    #   for redirecting output.
+    #   * *:outstream* (StringIO) --- for redirecting the codebuild project's stdout output
+    #   * *:errstream* (StringIO) --- for redirecting the codebuild project's stderr output
+    #   * *:dbgstream* (StringIO) --- for redirecting the runner's debug output (which otherwise goes to stderr)
+
+    def initialize(opts)
+      @outstream = opts[:outstream]
+      @errstream = opts[:errstream]
+      @dbgstream = opts[:dbgstream]
+    end
 
     # Run the CodeBuild project at the specified directory on the default AWS CodeBuild Ruby 2.3.1 image.
     #
@@ -25,8 +47,9 @@ module CodeBuildLocal
     #
     # @see run
     # @see CodeBuildLocal::DefaultImages.build_aws_codebuild_image
-    def self.run_default(path)
-      self.run(
+
+    def run_default(path)
+      run(
         CodeBuildLocal::DefaultImages.build_code_build_image,
         CodeBuildLocal::SourceProvider::FolderSourceProvider.new(path),
       )
@@ -46,14 +69,14 @@ module CodeBuildLocal
     #   relative to the root of the project.
     #
     # @return [Integer] The exit code from running the CodeBuild project.
-    def self.run(image, source_provider, build_spec_name="buildspec.yml")
-      configure_docker
-      build_spec = make_build_spec(source_provider, build_spec_name)
-      env = make_env(build_spec, get_credentials)
-      container = make_container(image, source_provider, env)
+    def run(image, source_provider, build_spec_name="buildspec.yml")
+      Runner.configure_docker
+      build_spec = Runner.make_build_spec(source_provider, build_spec_name)
+      env = Runner.make_env(build_spec, Runner.get_credentials)
+      container = Runner.make_container(image, source_provider, env)
 
       begin
-        prep_container container
+        Runner.prep_container container
         run_commands_on_container(container, build_spec)
       ensure
         unless container.nil?
@@ -195,7 +218,7 @@ module CodeBuildLocal
       shell_command = ""
       shell_command << "cd #{REMOTE_SOURCE_VOLUME_PATH}\n"
       shell_command << "set -o allexport && source /tmp/cbl_env && set +o allexport\n"
-      shell_command << "#{command}\n"
+      shell_command << "( #{command} )\n"
       shell_command << "_CBL_RET_VAL=\"$?\" && env > /tmp/cbl_env && exit $_CBL_RET_VAL"
       ["bash", "-c", shell_command]
     end
@@ -213,15 +236,15 @@ module CodeBuildLocal
     #
     # @return [Integer] The exit code.
 
-    def self.run_phase(container, phases, phase_name)
-      puts "[CodeBuildLocal Runner] Running phase \"#{phase_name}\"".yellow
+    def run_phase(container, phases, phase_name)
+      (@dbgstream || $stderr).puts "[CodeBuildLocal Runner] Running phase \"#{phase_name}\"".yellow
       phases[phase_name].each do |command|
-        puts "[CodeBuildLocal Runner] Running command \"#{phase_name}\"".yellow
-        returned = container.exec(make_command(command), :wait => DEFAULT_TIMEOUT_SECONDS) do |stream, chunk|
-          if stream == 'stderr'
-            print chunk.red
+        (@dbgstream || $stderr).puts "[CodeBuildLocal Runner] Running command \"#{command}\"".yellow
+        returned = container.exec(Runner.make_command(command), :wait => DEFAULT_TIMEOUT_SECONDS) do |stream, chunk|
+          if stream == :stderr
+            (@errstream || $stderr).print chunk
           else
-            print chunk
+            (@outstream || $stdout).print chunk
           end
         end
         exit_code = returned[2]
@@ -236,14 +259,14 @@ module CodeBuildLocal
     #
     # @see http://docs.aws.amazon.com/codebuild/latest/userguide/view-build-details.html#view-build-details-phases
 
-    def self.run_commands_on_container(container, build_spec)
-      exit_code = self.run_phase(container, build_spec.phases, "install")
+    def run_commands_on_container(container, build_spec)
+      exit_code = run_phase(container, build_spec.phases, "install")
       return exit_code if exit_code != 0
-      exit_code = self.run_phase(container, build_spec.phases, "pre_build")
+      exit_code = run_phase(container, build_spec.phases, "pre_build")
       return exit_code if exit_code != 0
 
-      build_exit_code = self.run_phase(container, build_spec.phases, "build")
-      post_build_exit_code = self.run_phase(container, build_spec.phases, "post_build")
+      build_exit_code = run_phase(container, build_spec.phases, "build")
+      post_build_exit_code = run_phase(container, build_spec.phases, "post_build")
       if build_exit_code != 0
         build_exit_code
       else

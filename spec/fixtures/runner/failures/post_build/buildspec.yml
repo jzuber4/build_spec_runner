@@ -1,0 +1,16 @@
+version: 0.2
+
+phases:
+  install:
+    commands:
+      - echo "ran install"
+  pre_build:
+    commands:
+      - echo "ran pre_build"
+  build:
+    commands:
+      - echo "ran build"
+  post_build:
+    commands:
+      - ruby -e 'exit 1'
+      - echo "SHOULDNT SEE THIS COMMAND"

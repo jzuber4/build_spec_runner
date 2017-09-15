@@ -3,6 +3,10 @@ require 'kwalify'
 module CodeBuildLocal
   module BuildSpec
 
+    # Phases of a buildspec file.
+
+    PHASES = ['install', 'pre_build', 'build', 'post_build']
+
     # Error for communicating issues with buildspec
 
     class BuildSpecError < StandardError
@@ -19,6 +23,7 @@ module CodeBuildLocal
     end
     
     # Class for representing a buildspec defined by a buildspec file.
+    # @see http://docs.aws.amazon.com/codebuild/latest/userguide/build-spec-ref.html
 
     class BuildSpec
 
@@ -58,14 +63,14 @@ module CodeBuildLocal
         end
 
         # parse env
-        @env = document['env']['variables'] if document['env']
+        @env = document['env']['variables'] if document['env'] and document['env']['variables']
         @env ||= {}
         @env.freeze
 
         # parse phases
         @phases = {}
-        for phase in ['install', 'pre_build', 'build', 'post_build']
-          @phases[phase] = document['phases'][phase]['commands'] if document['phases'][phase]
+        for phase in PHASES
+          @phases[phase] = document['phases'][phase]['commands'] unless document['phases'][phase].nil?
           @phases[phase] ||= []
         end
         @phases.freeze

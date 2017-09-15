@@ -1,0 +1,30 @@
+version: 0.2
+
+env:
+  variables:
+    VAR1: "value1"
+    VAR2: "value2"
+    VAR3: "value3"
+    VAR4: "value4"
+    ERR1: "err1"
+    ERR2: "err2"
+    ERR3: "err3"
+    ERR4: "err4"
+
+phases:
+  install:
+    commands:
+      - echo $VAR1
+      - ">&2 echo $ERR1"
+  pre_build:
+    commands:
+      - echo $VAR2
+      - ">&2 echo $ERR2"
+  build:
+    commands:
+      - echo $VAR3
+      - ">&2 echo $ERR3"
+  post_build:
+    commands:
+      - echo $VAR4
+      - ">&2 echo $ERR4"

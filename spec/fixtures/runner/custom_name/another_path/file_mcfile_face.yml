@@ -1,0 +1,11 @@
+version: 0.2
+
+env:
+  variables:
+    VAR1: "we can go deeper"
+
+phases:
+  pre_build:
+    commands:
+      - echo $VAR1
+

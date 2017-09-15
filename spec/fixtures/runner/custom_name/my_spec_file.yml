@@ -1,0 +1,10 @@
+version: 0.2
+
+env:
+  variables:
+    VAR1: "so predictable"
+
+phases:
+  pre_build:
+    commands:
+      - echo $VAR1

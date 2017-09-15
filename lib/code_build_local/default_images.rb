@@ -22,8 +22,8 @@ module CodeBuildLocal
     # specified by setting :repo_path.
     #
     # @param opts [Hash] A hash containing optional values
-    #   * :dockerfile_path - optional, override chosen AWS CodeBuild dockerfile. 
-    #   * :repo_path - optional, override path to clone AWS CodeBuild repo.
+    #   * *:dockerfile_path* (String) --- override chosen AWS CodeBuild dockerfile. 
+    #   * *:repo_path* (String) --- override path to clone AWS CodeBuild repo.
     #
     # @return [Docker::Image] A docker image with the specified AWS CodeBuild image.
     #
