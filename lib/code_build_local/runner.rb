@@ -89,7 +89,6 @@ module CodeBuildLocal
     private
 
     DEFAULT_TIMEOUT_SECONDS = 2000
-    ENV_FILE="/tmp/cbl_env"
     REMOTE_SOURCE_VOLUME_PATH_RO="/usr/app_ro/"
     REMOTE_SOURCE_VOLUME_PATH="/usr/app/"
 
@@ -192,23 +191,20 @@ module CodeBuildLocal
 
     # Prepare the container to run commands.
     # * The container is started.
-    # * The file used to store environment variables is created at {ENV_FILE}.
     # * The readonly source directory is copied from {REMOTE_SOURCE_VOLUME_PATH_RO}
     #   to a writable directory at {REMOTE_SOURCE_VOLUME_PATH}, for projects that require
     #   write permissions on the project directory.
 
     def self.prep_container container
       container.tap(&:start)
-      container.exec(['touch', ENV_FILE])
       container.exec(['cp', '-r', REMOTE_SOURCE_VOLUME_PATH_RO, REMOTE_SOURCE_VOLUME_PATH])
     end
 
     # Craft a command that can be sent to the running docker container to execute a single
     # project command.
     #
-    # Each command needs to be wrapped with code to move to the correct directory, reload
-    # the environment, save any new environment variables, and return the desired command's
-    # return value. This is certainly hacky, but I didn't find a nicer way to have granular
+    # Each command needs to be wrapped with code to move to the correct directory
+    # This is certainly hacky, but I didn't find a nicer way yet to have granular
     # command-by-command control of buildspec file execution.
     #
     # @param command [String] the command to be run
@@ -217,9 +213,7 @@ module CodeBuildLocal
     def self.make_command command
       shell_command = ""
       shell_command << "cd #{REMOTE_SOURCE_VOLUME_PATH}\n"
-      shell_command << "set -o allexport && source /tmp/cbl_env && set +o allexport\n"
-      shell_command << "( #{command} )\n"
-      shell_command << "_CBL_RET_VAL=\"$?\" && env > /tmp/cbl_env && exit $_CBL_RET_VAL"
+      shell_command << "#{command}\n"
       ["bash", "-c", shell_command]
     end
 

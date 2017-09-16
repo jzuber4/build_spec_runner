@@ -1,0 +1,17 @@
+version: 0.2
+
+phases:
+  install:
+    commands:
+      - export ENV_VAR="VALUE OF ENV"
+      - LOCAL_VAR="VALUE OF LOCAL"
+  pre_build:
+    commands:
+      - echo "ENV VALUE = $ENV_VAR"
+      - echo "LOCAL VALUE = $LOCAL_VAR"
+  build:
+    commands:
+      - cd folder_within_project
+  post_build:
+    commands:
+      - echo "pwd = $(pwd)"

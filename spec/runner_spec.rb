@@ -63,6 +63,8 @@ RSpec.describe Runner do
 
     JAVA_IMAGE_BUILDSPEC_DIR = File.join(FIXTURES_PATH, "java_image")
     CUSTOM_BUILDSPEC_NAME_DIR = File.join(FIXTURES_PATH, "custom_name")
+    FILES_DIR = File.join(FIXTURES_PATH, "files")
+    SHELL_ATTRIBUTES_DIR = File.join(FIXTURES_PATH, "shell")
 
     context "Custom image" do
       before :all do
@@ -112,6 +114,49 @@ RSpec.describe Runner do
 
       it "yields correct output" do
         expect(@runner.outstream.string).to eq("we can go deeper\n")
+      end
+    end
+
+    context "Copies over project" do
+      before :all do
+        @runner = make_runner
+        @exit_code = @runner.run(@default_image, FolderSourceProvider.new(FILES_DIR))
+      end
+
+      it "exits successfully" do
+        expect(@exit_code).to eq(0)
+      end
+
+      it "sees both files" do
+        expect(@runner.outstream.string).to eq("File 1's Contents\nFile 2's Contents\n")
+      end
+    end
+
+    # Right now we do some hacks to make it look like there's only one shell session, it might be
+    # nice to actually implement it as one shell session
+    context "Shell session attributes" do
+      before :all do
+        @runner = make_runner
+        @exit_code = @runner.run(@default_image, FolderSourceProvider.new(SHELL_ATTRIBUTES_DIR))
+      end
+
+      it "exits successfully" do
+        expect(@exit_code).to eq(0)
+      end
+
+      it "Remembers env variables" do
+        pending("Execute project in single shell session")
+        expect(@runner.outstream.string).to include("ENV VALUE = VALUE OF ENV")
+      end
+
+      it "Remembers local variables" do
+        pending("Execute project in single shell session")
+        expect(@runner.outstream.string).to include("LOCAL VALUE = VALUE OF LOCAL")
+      end
+
+      it "Remembers directory" do
+        pending("Execute project in single shell session")
+        expect(@runner.outstream.string).to include("/usr/app/folder_within_project")
       end
     end
 
