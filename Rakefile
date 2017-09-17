@@ -15,11 +15,8 @@ task :irb do
 end
 
 desc "Rebuild the gem"
-task :build_local_gem do
+task :install_local_gem do
   %x(gem build code_build_local.gemspec)
   require_relative "lib/code_build_local/version.rb"
   %x(gem install code_build_local-#{CodeBuildLocal::VERSION}.gem)
 end
-
-desc "Rebuild the gem, and open an irb terminal with the gem required"
-task :build_local_irb => [:build_local_gem, :irb]
