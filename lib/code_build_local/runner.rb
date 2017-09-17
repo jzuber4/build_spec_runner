@@ -1,7 +1,7 @@
 require 'aws-sdk-core'
 require 'colorize'
 require 'docker'
-require 'securerandom'
+require 'shellwords'
 
 module CodeBuildLocal
 
@@ -22,9 +22,7 @@ module CodeBuildLocal
     #   @return [StringIO, nil] the output stream for the redirected stdout of the CodeBuild project, or nil if none was specified.
     # @!attribute [r] errstream
     #   @return [StringIO, nil] the output stream for the redirected stderr of the CodeBuild project, or nil if none was specified.
-    # @!attribute [r] dbgstream
-    #   @return [StringIO, nil] the output stream for redirected debug messages, or nil if none was specified.
-    attr_accessor :outstream, :errstream, :dbgstream
+    attr_accessor :outstream, :errstream
 
     # Create a Runner instance.
     #
@@ -32,12 +30,10 @@ module CodeBuildLocal
     #   for redirecting output.
     #   * *:outstream* (StringIO) --- for redirecting the codebuild project's stdout output
     #   * *:errstream* (StringIO) --- for redirecting the codebuild project's stderr output
-    #   * *:dbgstream* (StringIO) --- for redirecting the runner's debug output (which otherwise goes to stderr)
 
     def initialize(opts)
       @outstream = opts[:outstream]
       @errstream = opts[:errstream]
-      @dbgstream = opts[:dbgstream]
     end
 
     # Run the CodeBuild project at the specified directory on the default AWS CodeBuild Ruby 2.3.1 image.
@@ -76,7 +72,6 @@ module CodeBuildLocal
       container = Runner.make_container(image, source_provider, env)
 
       begin
-        Runner.prep_container container
         run_commands_on_container(container, build_spec)
       ensure
         unless container.nil?
@@ -180,71 +175,97 @@ module CodeBuildLocal
     def self.make_container(image, source_provider, env)
       host_source_volume_path = source_provider.path
       Docker::Container.create(
-        # Create an image with env that includes AWS credentials and buildspec env vars
-        'Env' => env, 'Image' => image.id,
-        # Set default command to a shell so that the container stays running
-        'Cmd' => "/bin/bash", 'Tty' => true,
-        # Mount project source as readonly
-        'Volume' => {REMOTE_SOURCE_VOLUME_PATH_RO => {}}, 'Binds' => ["#{host_source_volume_path}:#{REMOTE_SOURCE_VOLUME_PATH_RO}:ro"]
-      ) 
+        'Image' => image.id,
+        'Env' => env,
+        'Cmd' => '/bin/bash',
+        'Tty' => true,
+        'Volume' => {REMOTE_SOURCE_VOLUME_PATH_RO => {}}, 'Binds' => ["#{host_source_volume_path}:#{REMOTE_SOURCE_VOLUME_PATH_RO}:ro"],
+      )
     end
 
-    # Prepare the container to run commands.
-    # * The container is started.
-    # * The readonly source directory is copied from {REMOTE_SOURCE_VOLUME_PATH_RO}
-    #   to a writable directory at {REMOTE_SOURCE_VOLUME_PATH}, for projects that require
-    #   write permissions on the project directory.
+    # Bookkeeping bash variable for tracking whether a command has exited unsuccessfully
+    DO_NEXT = "_cbl_do_next_cmd_"
+    # Bookkeeping bash variable for tracking the build phase exit code
+    BUILD_EXIT_CODE = "_cbl_build_exit_code_"
+    # Bookkeeping bash variable for tracking most phases' exit codes
+    EXIT_CODE = "_cbl_exit_code_"
+    # Prepend this to container debug messages
+    DEBUG_HEADER = "[CodeBuildLocal Runner]"
 
-    def self.prep_container container
-      container.tap(&:start)
-      container.exec(['cp', '-r', REMOTE_SOURCE_VOLUME_PATH_RO, REMOTE_SOURCE_VOLUME_PATH])
+    # Make a conditional shell command
+    #
+    # @param test [String] The variable to test.
+    # @param zero [String] If test equals zero, run this command
+    # @param not_zero [String] If test does not equal zero, run this command
+
+    def make_if test, zero, not_zero
+      noop = "echo -n"
+      "if [ \"0\" -eq \"$#{test}\" ]; then #{zero || noop}; else #{not_zero || noop} ; fi"
     end
 
-    # Craft a command that can be sent to the running docker container to execute a single
-    # project command.
-    #
-    # Each command needs to be wrapped with code to move to the correct directory
-    # This is certainly hacky, but I didn't find a nicer way yet to have granular
-    # command-by-command control of buildspec file execution.
-    #
-    # @param command [String] the command to be run
-    # @return [Array<String>] an array describing the (bash) command to be run on the container.
+    # Make a shell command that will run if DO_NEXT is 0 (i.e. no errors)
 
-    def self.make_command command
-      shell_command = ""
-      shell_command << "cd #{REMOTE_SOURCE_VOLUME_PATH}\n"
-      shell_command << "#{command}\n"
-      ["bash", "-c", shell_command]
+    def maybe_command command
+      make_if DO_NEXT, command, nil
     end
 
-    # Run all the commands in a given phase.
-    #
-    # Runs all the commands in a given phase, until any of them exit unsuccessfully. Has nice
-    # printing for stdout versus stderr, as well as debug commands that describe which phase
-    # and commands are being run.
-    #
-    # @param container [Docker::Container] The docker container to run the commands on, expects
-    #   settings configured by {make_container} and {prep_container}.
-    # @param phases [Hash] A hash containing phases.
-    # @param phase_name [String] The name of the current phase
-    #
-    # @return [Integer] The exit code.
+    # Make a shell command to print a debug message to stderr
 
-    def run_phase(container, phases, phase_name)
-      (@dbgstream || $stderr).puts "[CodeBuildLocal Runner] Running phase \"#{phase_name}\"".yellow
-      phases[phase_name].each do |command|
-        (@dbgstream || $stderr).puts "[CodeBuildLocal Runner] Running command \"#{command}\"".yellow
-        returned = container.exec(Runner.make_command(command), :wait => DEFAULT_TIMEOUT_SECONDS) do |stream, chunk|
-          if stream == :stderr
-            (@errstream || $stderr).print chunk
-          else
-            (@outstream || $stdout).print chunk
-          end
+    def debug_message message
+      ">&2 echo #{DEBUG_HEADER} #{message}"
+    end
+
+    # Make a shell script to imitate the behavior of the CodeBuild agent.
+    #
+    # This duplicates the running semantics of CodeBuild, including phase order, shell session, behavior, etc.
+    #
+    # @param build_spec [CodeBuildLocal::BuildSpec::BuildSpec] A build spec object containing the commands to run
+    # @return [Array<String>] An array to execute an agent script that runs the CodeBuild project
+    
+    def make_agent_script build_spec
+      # Setup the container. Copy project to a writable dir, go to the dir, set bookkeeping vars
+      commands = [
+        "cp -r #{REMOTE_SOURCE_VOLUME_PATH_RO} #{REMOTE_SOURCE_VOLUME_PATH}",
+        "cd #{REMOTE_SOURCE_VOLUME_PATH}",
+        "#{DO_NEXT}=\"0\"",
+        "#{EXIT_CODE}=\"0\"",
+        "#{BUILD_EXIT_CODE}=\"0\"",
+      ]
+
+      CodeBuildLocal::BuildSpec::PHASES.each do |phase|
+        commands << debug_message("Running phase \\\"#{phase}\\\"")
+
+        build_spec.phases[phase].each do |cmd|
+          # Run the given command, continue if the command exits successfully
+          commands << debug_message("Running command \\\"#{cmd.shellescape}\\\"")
+          commands << maybe_command("#{cmd} ; #{EXIT_CODE}=\"$?\"")
+          commands << maybe_command(
+            make_if(EXIT_CODE, nil, [
+              "#{DO_NEXT}=\"$#{EXIT_CODE}\"",
+              debug_message("Command failed \\\"#{cmd.shellescape}\\\""),
+            ].join("\n"))
+          )
         end
-        exit_code = returned[2]
-        return exit_code if exit_code != 0
+
+        commands << make_if(
+          EXIT_CODE,
+          debug_message("Completed phase \\\"#{phase}\\\", successful: true"),
+          debug_message("Completed phase \\\"#{phase}\\\", successful: false"),
+        )
+
+        if phase == "build"
+          # If the build phase exits successfully, dont exit, continue onto post_build
+          commands << make_if(EXIT_CODE, nil, "#{BUILD_EXIT_CODE}=$#{EXIT_CODE};#{EXIT_CODE}=\"0\";#{DO_NEXT}=\"0\"")
+        elsif phase == "post_build"
+          # exit BUILD_EXIT_CODE || EXIT_CODE
+          commands << make_if(BUILD_EXIT_CODE, nil, "exit $#{BUILD_EXIT_CODE}")
+          commands << make_if(EXIT_CODE, nil, "exit $#{EXIT_CODE}")
+        else
+          commands << make_if(EXIT_CODE, nil, "exit $#{EXIT_CODE}")
+        end
       end
-      0
+
+      ["bash", "-c", commands.join("\n")]
     end
 
     # Run the commands of the given buildspec on the given container.
@@ -254,18 +275,15 @@ module CodeBuildLocal
     # @see http://docs.aws.amazon.com/codebuild/latest/userguide/view-build-details.html#view-build-details-phases
 
     def run_commands_on_container(container, build_spec)
-      exit_code = run_phase(container, build_spec.phases, "install")
-      return exit_code if exit_code != 0
-      exit_code = run_phase(container, build_spec.phases, "pre_build")
-      return exit_code if exit_code != 0
-
-      build_exit_code = run_phase(container, build_spec.phases, "build")
-      post_build_exit_code = run_phase(container, build_spec.phases, "post_build")
-      if build_exit_code != 0
-        build_exit_code
-      else
-        post_build_exit_code
+      agent_script = make_agent_script build_spec
+      returned = container.tap(&:start).exec(agent_script, :wait => DEFAULT_TIMEOUT_SECONDS) do |stream, chunk|
+        if stream == :stdout
+          (@outstream || $stdout).print chunk
+        else
+          (@errstream || $stderr).print chunk
+        end
       end
+      returned[2]
     end
   end
 end

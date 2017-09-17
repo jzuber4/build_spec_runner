@@ -12,5 +12,6 @@ phases:
       - echo "ran build"
   post_build:
     commands:
+      - echo "ran post_build"
       - ruby -e 'exit 1'
       - echo "SHOULDNT SEE THIS COMMAND"

@@ -13,7 +13,6 @@ RSpec.describe Runner do
     Runner.new({
       :outstream => StringIO.new,
       :errstream => StringIO.new,
-      :dbgstream => StringIO.new,
     })
   end
 
@@ -40,21 +39,23 @@ RSpec.describe Runner do
       end
 
       it "outputs to stderr" do
-        expect(@runner.errstream.string).to eq("err1\nerr2\nerr3\nerr4\n")
+        filtered_lines = @runner.errstream.string
+            .split("\n")
+            .reject{|line| line =~ /^\[CodeBuildLocal Runner\]/}
+            .join("\n")
+        expect(filtered_lines).to eq("err1\nerr2\nerr3\nerr4")
       end
 
       it "outputs debug phase messages" do
-        expect(@runner.dbgstream.string).to include('[CodeBuildLocal Runner] Running phase "install"'.yellow)
-        expect(@runner.dbgstream.string).to include('[CodeBuildLocal Runner] Running phase "pre_build"'.yellow)
-        expect(@runner.dbgstream.string).to include('[CodeBuildLocal Runner] Running phase "build"'.yellow)
-        expect(@runner.dbgstream.string).to include('[CodeBuildLocal Runner] Running phase "post_build"'.yellow)
+        expect(@runner.errstream.string).to include('[CodeBuildLocal Runner] Running phase "build"')
+        expect(@runner.errstream.string).to include('[CodeBuildLocal Runner] Running phase "post_build"')
       end
 
       it "outputs debug command messages" do
-        expect(@runner.dbgstream.string).to include('[CodeBuildLocal Runner] Running command "echo $VAR1"'.yellow)
-        expect(@runner.dbgstream.string).to include('[CodeBuildLocal Runner] Running command "echo $VAR2"'.yellow)
-        expect(@runner.dbgstream.string).to include('[CodeBuildLocal Runner] Running command "echo $VAR3"'.yellow)
-        expect(@runner.dbgstream.string).to include('[CodeBuildLocal Runner] Running command "echo $VAR4"'.yellow)
+        expect(@runner.errstream.string).to include('[CodeBuildLocal Runner] Running command "echo $VAR1"')
+        expect(@runner.errstream.string).to include('[CodeBuildLocal Runner] Running command "echo $VAR2"')
+        expect(@runner.errstream.string).to include('[CodeBuildLocal Runner] Running command "echo $VAR3"')
+        expect(@runner.errstream.string).to include('[CodeBuildLocal Runner] Running command "echo $VAR4"')
       end
     end
   end
@@ -145,17 +146,14 @@ RSpec.describe Runner do
       end
 
       it "Remembers env variables" do
-        pending("Execute project in single shell session")
         expect(@runner.outstream.string).to include("ENV VALUE = VALUE OF ENV")
       end
 
       it "Remembers local variables" do
-        pending("Execute project in single shell session")
         expect(@runner.outstream.string).to include("LOCAL VALUE = VALUE OF LOCAL")
       end
 
       it "Remembers directory" do
-        pending("Execute project in single shell session")
         expect(@runner.outstream.string).to include("/usr/app/folder_within_project")
       end
     end
@@ -180,11 +178,12 @@ RSpec.describe Runner do
         end
 
         it "only runs install" do
-          expect(@runner.dbgstream.string).to include('[CodeBuildLocal Runner] Running phase "install"'.yellow)
+          expect(@runner.errstream.string).to include('[CodeBuildLocal Runner] Running phase "install"')
+          expect(@runner.outstream.string).to include('ran install')
           expect(@runner.outstream.string).not_to eq("SHOULDNT SEE THIS PHASE")
-          expect(@runner.dbgstream.string).not_to include('[CodeBuildLocal Runner] Running phase "pre_build"'.yellow)
-          expect(@runner.dbgstream.string).not_to include('[CodeBuildLocal Runner] Running phase "build"'.yellow)
-          expect(@runner.dbgstream.string).not_to include('[CodeBuildLocal Runner] Running phase "post_build"'.yellow)
+          expect(@runner.errstream.string).not_to include('[CodeBuildLocal Runner] Running phase "pre_build"')
+          expect(@runner.errstream.string).not_to include('[CodeBuildLocal Runner] Running phase "build"')
+          expect(@runner.errstream.string).not_to include('[CodeBuildLocal Runner] Running phase "post_build"')
         end
       end
 
@@ -204,11 +203,11 @@ RSpec.describe Runner do
         end
 
         it "Runs install and pre_build" do
-          expect(@runner.dbgstream.string).to include('[CodeBuildLocal Runner] Running phase "install"'.yellow)
-          expect(@runner.dbgstream.string).to include('[CodeBuildLocal Runner] Running phase "pre_build"'.yellow)
+          ['install', 'pre_build'].each do |phase|
+            expect(@runner.errstream.string).to include("[CodeBuildLocal Runner] Running phase \"#{phase}\"")
+            expect(@runner.outstream.string).to include("ran #{phase}")
+          end
           expect(@runner.outstream.string).not_to eq("SHOULDNT SEE THIS PHASE")
-          expect(@runner.dbgstream.string).not_to include('[CodeBuildLocal Runner] Running phase "build"'.yellow)
-          expect(@runner.dbgstream.string).not_to include('[CodeBuildLocal Runner] Running phase "post_build"'.yellow)
         end
       end
 
@@ -228,10 +227,10 @@ RSpec.describe Runner do
         end
 
         it "Runs all phases" do
-          expect(@runner.dbgstream.string).to include('[CodeBuildLocal Runner] Running phase "install"'.yellow)
-          expect(@runner.dbgstream.string).to include('[CodeBuildLocal Runner] Running phase "pre_build"'.yellow)
-          expect(@runner.dbgstream.string).to include('[CodeBuildLocal Runner] Running phase "build"'.yellow)
-          expect(@runner.dbgstream.string).to include('[CodeBuildLocal Runner] Running phase "post_build"'.yellow)
+          CodeBuildLocal::BuildSpec::PHASES.each do |phase|
+            expect(@runner.errstream.string).to include("[CodeBuildLocal Runner] Running phase \"#{phase}\"")
+            expect(@runner.outstream.string).to include("ran #{phase}")
+          end
         end
       end
 
@@ -251,10 +250,10 @@ RSpec.describe Runner do
         end
 
         it "Runs all phases" do
-          expect(@runner.dbgstream.string).to include('[CodeBuildLocal Runner] Running phase "install"'.yellow)
-          expect(@runner.dbgstream.string).to include('[CodeBuildLocal Runner] Running phase "pre_build"'.yellow)
-          expect(@runner.dbgstream.string).to include('[CodeBuildLocal Runner] Running phase "build"'.yellow)
-          expect(@runner.dbgstream.string).to include('[CodeBuildLocal Runner] Running phase "post_build"'.yellow)
+          CodeBuildLocal::BuildSpec::PHASES.each do |phase|
+            expect(@runner.errstream.string).to include("[CodeBuildLocal Runner] Running phase \"#{phase}\"")
+            expect(@runner.outstream.string).to include("ran #{phase}")
+          end
         end
       end
     end
