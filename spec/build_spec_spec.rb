@@ -111,7 +111,6 @@ RSpec.describe BuildSpec do
     end
 
     it "Missing phase command" do
-      pending("Validation to support required mapping under optional one")
       bad_file_contents = BASE_BAD_FILE_CONTENTS + "  build:\n"
       buildspec_file = BuildSpecHelper.make_buildspec_file bad_file_contents
       expect{BuildSpec.new buildspec_file}.to raise_error(BuildSpecError)
@@ -136,7 +135,6 @@ RSpec.describe BuildSpec do
     end
 
     it "Missing env variables" do
-      pending("Validation to support required mapping under optional one")
       bad_file_contents = BASE_BAD_FILE_CONTENTS + "env:\n"
       buildspec_file = BuildSpecHelper.make_buildspec_file bad_file_contents
       expect{BuildSpec.new buildspec_file}.to raise_error(BuildSpecError)
@@ -161,7 +159,6 @@ RSpec.describe BuildSpec do
     end
 
     it "Missing artifacts files" do
-      pending("Validation to support required mapping under optional one")
       bad_file_contents = BASE_BAD_FILE_CONTENTS + "artifacts:\n"
       buildspec_file = BuildSpecHelper.make_buildspec_file bad_file_contents
       expect{BuildSpec.new buildspec_file}.to raise_error(BuildSpecError)

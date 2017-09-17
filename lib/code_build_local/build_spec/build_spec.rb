@@ -1,4 +1,5 @@
 require 'kwalify'
+require 'yaml'
 
 module CodeBuildLocal
   module BuildSpec
@@ -74,6 +75,22 @@ module CodeBuildLocal
           @phases[phase] ||= []
         end
         @phases.freeze
+
+        # Validate some things that kwalify doesn't catch
+        # TODO: remove this hack
+        document = YAML.load_file(filename)
+        if document.key? 'env' and document['env'].nil?
+          puts "hello"
+          raise BuildSpecError.new('Mapping "env" requires mapping "variables"', filename)
+        end
+        for phase in PHASES
+          if document['phases'].key? phase and document['phases'][phase].nil?
+            raise BuildSpecError.new("Mapping \"phases => #{phase}\" requires mapping \"commands\"", filename)
+          end
+        end
+        if document.key? 'artifacts' and document['artifacts'].nil?
+          raise BuildSpecError.new('Mapping "artifacts" requires mapping "files"', filename)
+        end
       end
     end
   end
