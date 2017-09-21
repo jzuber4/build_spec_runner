@@ -1,5 +1,4 @@
 require 'aws-sdk-core'
-require 'colorize'
 require 'docker'
 require 'shellwords'
 

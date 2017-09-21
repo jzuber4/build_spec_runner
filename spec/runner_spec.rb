@@ -1,4 +1,3 @@
-require 'colorize'
 require 'spec_helper'
 
 Runner = CodeBuildLocal::Runner
