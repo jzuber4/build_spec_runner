@@ -108,7 +108,7 @@ Arguments:
 
     private
 
-    attr_accessor :options
+    attr_reader :options
 
     # Extension point for mocking interaction with runner
 

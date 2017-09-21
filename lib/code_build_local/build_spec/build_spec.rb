@@ -15,7 +15,7 @@ module CodeBuildLocal
       # @!attribute [r] filename
       #   @return [String] the filename of the buildspec that caused the error
 
-      attr_accessor :filename
+      attr_reader :filename
 
       def initialize(message, filename)
         @filename = filename
@@ -34,7 +34,7 @@ module CodeBuildLocal
       #   @return [Map<String, Array<String>>] A mapping of phase name to a list of commands
       #   for that phase
 
-      attr_accessor :env, :phases
+      attr_reader :env, :phases
 
       # Parse a buildspec file to create a BuildSpec object. Parses the file according to a
       # buildspec schema.

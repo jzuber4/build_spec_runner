@@ -16,7 +16,7 @@ module CodeBuildLocal
 
       # @!attribute [r] path
       #   @return [String] the path to the project source. Can be relative or absolute.
-      attr_accessor :path
+      attr_reader :path
 
       def initialize path
         @path = File.expand_path(path).freeze

@@ -27,7 +27,7 @@ module CodeBuildLocal
     # @!attribute [r] errstream
     #   @return [StringIO, nil] the output stream for the redirected stderr of the CodeBuild project, or nil if none was specified.
 
-    attr_accessor :outstream, :errstream
+    attr_reader :outstream, :errstream
 
     # Create a Runner instance.
     #
