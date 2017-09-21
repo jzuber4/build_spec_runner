@@ -13,10 +13,3 @@ task :irb do
   ARGV.clear
   IRB.start
 end
-
-desc "Rebuild the gem"
-task :install_local_gem do
-  %x(gem build code_build_local.gemspec)
-  require_relative "lib/code_build_local/version.rb"
-  %x(gem install code_build_local-#{CodeBuildLocal::VERSION}.gem)
-end
