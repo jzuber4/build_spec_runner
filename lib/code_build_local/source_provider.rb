@@ -15,11 +15,11 @@ module CodeBuildLocal
       include SourceProvider
 
       # @!attribute [r] path
-      #   @return [String] the path to the project source
+      #   @return [String] the path to the project source. Can be relative or absolute.
       attr_accessor :path
 
       def initialize path
-        @path = path.freeze
+        @path = File.expand_path(path).freeze
       end
     end
   end

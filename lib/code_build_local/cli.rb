@@ -53,7 +53,6 @@ module CodeBuildLocal
     # * \-p \-\-path PATH --- Required argument, path the to the CodeBuild project to run
     # * \-q \-\-quiet --- Silence debug messages.
     # * \-\-build_spec_path BUILD_SPEC_PATH --- Alternative path for buildspec file, defaults to {Runner::DEFAULT_BUILD_SPEC_PATH}.
-    #   Currently, only relative paths are allowed.
     # * \-\-image_id IMAGE_ID --- Id of alternative docker image to use. This cannot be specified at the same time as \-\-aws_dockerfile_path
     # * \-\-aws_dockerfile_path AWS_DOCKERFILE_PATH --- Alternative AWS CodeBuild Dockerfile path, defaults to {DefaultImages::DEFAULT_DOCKERFILE_PATH}.
     #   This cannot be specified at the same time as \-\-image_id.
@@ -74,25 +73,17 @@ module CodeBuildLocal
           options[:quiet] = true
         end
         opts.on('--build_spec_path BUILD_SPEC_PATH',
-                %|
-                  Alternative path for buildspec file, defaults to #{Runner::DEFAULT_BUILD_SPEC_PATH}.
-                  Currently, only relative paths are allowed.
-                 |) do |build_spec_path|
+                'Alternative path for buildspec file, defaults to #{Runner::DEFAULT_BUILD_SPEC_PATH}.') do |build_spec_path|
           options[:build_spec_path] = build_spec_path
         end
         opts.on('--image_id IMAGE_ID',
-                %|
-                  Id of alternative docker image to use.
-                  NOTE: this cannot be specified at the same time as --aws_dockerfile_path
-                 |) do |image_id|
+                'Id of alternative docker image to use. NOTE: this cannot be specified at the same time as --aws_dockerfile_path') do |image_id|
           options[:image_id] = image_id
         end
         opts.on('--aws_dockerfile_path AWS_DOCKERFILE_PATH',
-                %|
-                  Alternative AWS CodeBuild DockerFile path, default is "ubuntu/ruby/2.3.1/".
-                  NOTE: this cannot be specified at the same time as --aws_dockerfile_path .
-                  See: https://github.com/aws/aws-codebuild-docker-images
-                 |) do |aws_dockerfile_path|
+                'Alternative AWS CodeBuild DockerFile path, default is "ubuntu/ruby/2.3.1/". '\
+                'NOTE: this cannot be specified at the same time as --image_id . '\
+                'See: https://github.com/aws/aws-codebuild-docker-images') do |aws_dockerfile_path|
           options[:aws_dockerfile_path] = aws_dockerfile_path
         end
       end

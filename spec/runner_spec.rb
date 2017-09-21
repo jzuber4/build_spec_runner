@@ -1,4 +1,5 @@
 require 'spec_helper'
+require 'pathname'
 
 Runner = CodeBuildLocal::Runner
 DefaultImages = CodeBuildLocal::DefaultImages
@@ -87,6 +88,23 @@ RSpec.describe Runner do
       end
     end
 
+    context "Relative source provider path" do
+      before :all do
+        @runner = make_runner
+        relative_dir = (Pathname.new DEFAULT_BUILDSPEC_DIR).relative_path_from(Pathname.new Dir.pwd)
+        image = DefaultImages.build_code_build_image
+        @exit_code = @runner.run(image, FolderSourceProvider.new(relative_dir))
+      end
+
+      it "exits succesfully" do
+        expect(@exit_code).to eq(0)
+      end
+
+      it "outputs correct stdout" do
+        expect(@runner.outstream.string).to eq("value1\nvalue2\nvalue3\nvalue4\n")
+      end
+    end
+
     context "Custom image" do
       before :all do
         @runner = make_runner
@@ -122,10 +140,26 @@ RSpec.describe Runner do
       end
     end
 
-    context "Custom buildspec name with path" do
+    context "Custom buildspec name with relative path" do
       before :all do
         @runner = make_runner
         build_spec_path = "another_path/file_mcfile_face.yml"
+        @exit_code = @runner.run(@default_image, FolderSourceProvider.new(CUSTOM_BUILDSPEC_NAME_DIR), :build_spec_path => build_spec_path)
+      end
+
+      it "exits successfully" do
+        expect(@exit_code).to eq(0)
+      end
+
+      it "yields correct output" do
+        expect(@runner.outstream.string).to eq("we can go deeper\n")
+      end
+    end
+
+    context "Custom buildspec name with absolute path" do
+      before :all do
+        @runner = make_runner
+        build_spec_path = File.join(CUSTOM_BUILDSPEC_NAME_DIR, "another_path/file_mcfile_face.yml")
         @exit_code = @runner.run(@default_image, FolderSourceProvider.new(CUSTOM_BUILDSPEC_NAME_DIR), :build_spec_path => build_spec_path)
       end
 

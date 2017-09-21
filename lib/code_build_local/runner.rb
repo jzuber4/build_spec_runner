@@ -1,5 +1,6 @@
 require 'aws-sdk-core'
 require 'docker'
+require 'pathname'
 require 'shellwords'
 
 module CodeBuildLocal
@@ -152,15 +153,20 @@ module CodeBuildLocal
     #
     # @param source_provider [CodeBuildLocal::SourceProvider] A source provider that yields the path for
     #   the desired CodeBuild project.
-    # @param build_spec_name [String] The path and file name for the buildspec file in the project directory.
+    # @param build_spec_path [String] The path and file name for the buildspec file in the project directory.
+    #   examples: "buildspec.yml", "./foo/build_spec.yml", "bar/bs.yml", "../../weird/but/ok.yml", "/absolute/paths/too.yml"
     #
     # @return [CodeBuildLocal::BuildSpec::BuildSpec] A BuildSpec object representing the information contained
     #   by the specified buildspec.
     #
     # @see CodeBuildLocal::BuildSpec::BuildSpec
 
-    def self.make_build_spec(source_provider, build_spec_name="buildspec.yml")
-      CodeBuildLocal::BuildSpec::BuildSpec.new(File.join(source_provider.path, build_spec_name))
+    def self.make_build_spec(source_provider, build_spec_path="buildspec.yml")
+      if Pathname.new(build_spec_path).absolute?
+        CodeBuildLocal::BuildSpec::BuildSpec.new(build_spec_path)
+      else
+        CodeBuildLocal::BuildSpec::BuildSpec.new(File.join(source_provider.path, build_spec_path))
+      end
     end
 
     # Make a docker container from the specified image for running the CodeBuild project.
