@@ -1,4 +1,5 @@
 require 'code_build_local/build_spec/build_spec'
+require 'code_build_local/cli'
 require 'code_build_local/default_images'
 require 'code_build_local/runner'
 require 'code_build_local/source_provider'

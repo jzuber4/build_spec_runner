@@ -15,7 +15,7 @@ module CodeBuildLocal
     # Build an AWS CodeBuild Docker image.
     #
     # Defaults to the AWS CodeBuild Ruby 2.3.1 image.
-    # Different AWS CodeBuild images can be specified by setting :dockerfile_path
+    # Different AWS CodeBuild images can be specified by setting :aws_dockerfile_path
     # to a different setting, the default is {DEFAULT_DOCKERFILE_PATH}.
     # This method clones the {https://github.com/aws/aws-codebuild-docker-images AWS CodeBuild Images repo}
     # locally. The repo will be cloned to {REPO_PATH}, unless a different repo path is
@@ -31,7 +31,7 @@ module CodeBuildLocal
 
     def self.build_code_build_image opts={}
 
-      dockerfile_path = opts[:dockerfile_path]
+      dockerfile_path = opts[:aws_dockerfile_path]
       dockerfile_path ||= DEFAULT_DOCKERFILE_PATH
       repo_path = opts[:repo_path]
       repo_path ||= REPO_PATH

@@ -8,11 +8,11 @@ RSpec.describe Runner do
 
   FIXTURES_PATH = File.join(File.dirname(__FILE__), "fixtures/runner")
 
-  def make_runner
-    Runner.new({
+  def make_runner opts={}
+    Runner.new(opts.merge({
       :outstream => StringIO.new,
       :errstream => StringIO.new,
-    })
+    }))
   end
 
   before :all do
@@ -66,10 +66,31 @@ RSpec.describe Runner do
     FILES_DIR = File.join(FIXTURES_PATH, "files")
     SHELL_ATTRIBUTES_DIR = File.join(FIXTURES_PATH, "shell")
 
+    context "Quiet" do
+      before :all do
+        @runner = make_runner :quiet => true
+        image = DefaultImages.build_code_build_image
+        @exit_code = @runner.run(image, FolderSourceProvider.new(DEFAULT_BUILDSPEC_DIR))
+      end
+
+      it "exits succesfully" do
+        expect(@exit_code).to eq(0)
+      end
+
+      it "outputs correct stdout and stderr" do
+        expect(@runner.outstream.string).to eq("value1\nvalue2\nvalue3\nvalue4\n")
+        expect(@runner.errstream.string).to eq("err1\nerr2\nerr3\nerr4\n")
+      end
+
+      it "doesn't output debug messages" do
+        expect(@runner.errstream.string).to_not include("[CodeBuildLocal Runner]")
+      end
+    end
+
     context "Custom image" do
       before :all do
         @runner = make_runner
-        image = DefaultImages.build_code_build_image({:dockerfile_path => 'ubuntu/java/openjdk-8'})
+        image = DefaultImages.build_code_build_image({:aws_dockerfile_path => 'ubuntu/java/openjdk-8'})
         @exit_code = @runner.run(image, FolderSourceProvider.new(JAVA_IMAGE_BUILDSPEC_DIR))
       end
 
@@ -88,8 +109,8 @@ RSpec.describe Runner do
       before :all do
         @runner = make_runner
         image = DefaultImages.build_code_build_image
-        buildspec_path = "my_spec_file.yml"
-        @exit_code = @runner.run(image, FolderSourceProvider.new(CUSTOM_BUILDSPEC_NAME_DIR), buildspec_path)
+        build_spec_path = "my_spec_file.yml"
+        @exit_code = @runner.run(image, FolderSourceProvider.new(CUSTOM_BUILDSPEC_NAME_DIR), :build_spec_path => build_spec_path)
       end
 
       it "exits successfully" do
@@ -104,8 +125,8 @@ RSpec.describe Runner do
     context "Custom buildspec name with path" do
       before :all do
         @runner = make_runner
-        buildspec_path = "another_path/file_mcfile_face.yml"
-        @exit_code = @runner.run(@default_image, FolderSourceProvider.new(CUSTOM_BUILDSPEC_NAME_DIR), buildspec_path)
+        build_spec_path = "another_path/file_mcfile_face.yml"
+        @exit_code = @runner.run(@default_image, FolderSourceProvider.new(CUSTOM_BUILDSPEC_NAME_DIR), :build_spec_path => build_spec_path)
       end
 
       it "exits successfully" do

@@ -17,10 +17,15 @@ module CodeBuildLocal
 
   class Runner
 
+    # The default path of the buildspec file in a project.
+
+    DEFAULT_BUILD_SPEC_PATH = 'buildspec.yml'
+
     # @!attribute [r] outstream
     #   @return [StringIO, nil] the output stream for the redirected stdout of the CodeBuild project, or nil if none was specified.
     # @!attribute [r] errstream
     #   @return [StringIO, nil] the output stream for the redirected stderr of the CodeBuild project, or nil if none was specified.
+
     attr_accessor :outstream, :errstream
 
     # Create a Runner instance.
@@ -30,9 +35,10 @@ module CodeBuildLocal
     #   * *:outstream* (StringIO) --- for redirecting the codebuild project's stdout output
     #   * *:errstream* (StringIO) --- for redirecting the codebuild project's stderr output
 
-    def initialize(opts)
+    def initialize(opts = {})
       @outstream = opts[:outstream]
       @errstream = opts[:errstream]
+      @quiet     = opts[:quiet] || false
     end
 
     # Run the CodeBuild project at the specified directory on the default AWS CodeBuild Ruby 2.3.1 image.
@@ -54,19 +60,22 @@ module CodeBuildLocal
     #
     # Run a CodeBuild project on the specified image, with the source pointed to by
     # the specified source provider. If the buildspec filename is not buildspec.yml or
-    # is not located in the project root, specify an different relative path and file
-    # for the parameter build_spec_name.
+    # is not located in the project root, specify the option :build_spec_path to choose a different
+    # relative path (including filename).
     #
     # @param image [Docker::Image] A docker image to run the CodeBuild project on.
     # @param source_provider [CodeBuildLocal::SourceProvider] A source provider that yields
     #   the source for the CodeBuild project.
-    # @param build_spec_name [String] The relative path and filename for the buildspec file,
-    #   relative to the root of the project.
+    # @param opts [Hash] A hash containing options:
+    #   * *:build_spec_path* (String) --- Path of the buildspec file (including filename )
+    #     relative to the CodeBuild project root. Defaults to {DEFAULT_BUILD_SPEC_PATH}.
     #
     # @return [Integer] The exit code from running the CodeBuild project.
-    def run(image, source_provider, build_spec_name="buildspec.yml")
+
+    def run(image, source_provider, opts = {})
+      build_spec_path = opts[:build_spec_path] || DEFAULT_BUILD_SPEC_PATH
       Runner.configure_docker
-      build_spec = Runner.make_build_spec(source_provider, build_spec_name)
+      build_spec = Runner.make_build_spec(source_provider, build_spec_path)
       env = Runner.make_env(build_spec, Runner.get_credentials)
       container = Runner.make_container(image, source_provider, env)
 
@@ -211,7 +220,12 @@ module CodeBuildLocal
     # Make a shell command to print a debug message to stderr
 
     def debug_message message
-      ":"
+      if @quiet
+        # noop
+        ":"
+      else
+        ">&2 echo #{DEBUG_HEADER} #{message}"
+      end
     end
 
     # Make a shell script to imitate the behavior of the CodeBuild agent.
