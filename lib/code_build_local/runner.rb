@@ -198,7 +198,7 @@ module CodeBuildLocal
     # @param not_zero [String] If test does not equal zero, run this command
 
     def make_if test, zero, not_zero
-      noop = "echo -n"
+      noop = ":"
       "if [ \"0\" -eq \"$#{test}\" ]; then #{zero || noop}; else #{not_zero || noop} ; fi"
     end
 
@@ -211,7 +211,7 @@ module CodeBuildLocal
     # Make a shell command to print a debug message to stderr
 
     def debug_message message
-      ">&2 echo #{DEBUG_HEADER} #{message}"
+      ":"
     end
 
     # Make a shell script to imitate the behavior of the CodeBuild agent.
