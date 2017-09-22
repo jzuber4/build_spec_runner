@@ -13,78 +13,73 @@ RSpec.describe CLI do
   TEST_IMAGE = 'some_id'
   TEST_AWS_DOCKERFILE_PATH = 'ubuntu/java/openjdk-8'
 
-  class TestCLI < CLI
-    attr_accessor :runner
-
-    def make_runner opts
-      @runner.initialize opts
-      @runner
-    end
-  end
-
-  def make_cli argv
-    cli = TestCLI.new argv
-    runner = double("runner")
-    allow(runner).to receive(:initialize)
-    cli.runner = runner
-    cli
+  def mock_runner
+    runner = class_double("CodeBuildLocal::Runner").as_stubbed_const(:transfer_nested_constants => true)
+    allow(runner).to receive(:run) {|im, sp, opts| @im = im ; @sp = sp ; @opts = opts}
+    runner
   end
 
   describe "#run" do
     context "Default" do
       before :each do
-        @cli = make_cli ["-p", TEST_PATH]
-        allow(@cli.runner).to receive(:run) {|im, sp, opts| @im = im ; @sp = sp ; @opts = opts}
+        @runner = mock_runner
+        @cli = CLI.new ["-p", TEST_PATH]
         @cli.run
-      end
-
-      it "Is not quiet" do
-        expect(@cli.runner).to have_received(:initialize).with(hash_including(:quiet => false))
       end
 
       it "Uses default image" do
         expect(@im.id).to eq(DefaultImages.build_code_build_image.id)
       end
 
-      it "Doesnt override build_spec_path" do
-        expect(@opts).to have_key(:build_spec_path)
-        expect(@opts[:build_spec_path]).to be_nil 
-      end
-
       it "Uses specified path" do
         expect(@sp.path).to eq(TEST_PATH)
+      end
+
+      it "Is not quiet" do
+        expect(@opts).to_not have_key(:quiet) 
+      end
+
+      it "Doesnt override build_spec_path" do
+        expect(@opts).to_not have_key(:build_spec_path)
       end
     end
 
     context "Parameters" do
       it "Supports alternate build spec path" do
-        @cli = make_cli ["-p", TEST_PATH, "--build_spec_path", TEST_BUILD_SPEC_PATH]
-        allow(@cli.runner).to receive(:run){|im, sp, opts| @im = im ; @sp = sp ; @opts = opts}
+        @runner = mock_runner
+        @cli = CLI.new ["-p", TEST_PATH, "--build_spec_path", TEST_BUILD_SPEC_PATH]
         @cli.run
         expect(@opts[:build_spec_path]).to eq(TEST_BUILD_SPEC_PATH)
       end
 
       it "Supports alternate image" do
+        @runner = mock_runner
         image = Docker::Image.get(Docker::Image.build("from alpine\nrun touch /test").id)
-        @cli = make_cli ["-p", TEST_PATH, "--image_id", image.id]
-        allow(@cli.runner).to receive(:run){|im, sp, opts| @im = im ; @sp = sp ; @opts = opts}
+        @cli = CLI.new ["-p", TEST_PATH, "--image_id", image.id]
         @cli.run
         expect(@im.id).to eq(image.id)
       end
 
       it "Supports alternate AWS Dockerfile" do
+        @runner = mock_runner
         image = DefaultImages.build_code_build_image :aws_dockerfile_path => TEST_AWS_DOCKERFILE_PATH
-        @cli = make_cli ["-p", TEST_PATH, "--aws_dockerfile_path", TEST_AWS_DOCKERFILE_PATH]
-        allow(@cli.runner).to receive(:run){|im, sp, opts| @im = im ; @sp = sp ; @opts = opts}
+        @cli = CLI.new ["-p", TEST_PATH, "--aws_dockerfile_path", TEST_AWS_DOCKERFILE_PATH]
         @cli.run
         expect(@im.id).to eq(image.id)
       end
 
       it "Supports quiet" do
-        @cli = make_cli ["-p", TEST_PATH, "-q"]
-        allow(@cli.runner).to receive(:run)
+        @runner = mock_runner
+        @cli = CLI.new ["-p", TEST_PATH, "-q"]
         @cli.run
-        expect(@cli.runner).to have_received(:initialize).with(hash_including(:quiet => true))
+        expect(@opts).to have_key(:quiet)
+        expect(@opts[:quiet]).to be_truthy
+
+        @runner = mock_runner
+        @cli = CLI.new ["-p", TEST_PATH, "--quiet"]
+        @cli.run
+        expect(@opts).to have_key(:quiet)
+        expect(@opts[:quiet]).to be_truthy
       end
     end
   end

@@ -22,32 +22,6 @@ module CodeBuildLocal
 
     DEFAULT_BUILD_SPEC_PATH = 'buildspec.yml'
 
-    # @!attribute [r] outstream
-    #   @return [StringIO, nil] the output stream for the redirected stdout of the CodeBuild project, or nil if none was specified.
-    # @!attribute [r] errstream
-    #   @return [StringIO, nil] the output stream for the redirected stderr of the CodeBuild project, or nil if none was specified.
-
-    attr_reader :outstream, :errstream
-
-    # Create a Runner instance.
-    #
-    # @param opts [Hash] A hash containing several optional values,
-    #   for redirecting output.
-    #   * *:outstream* (StringIO) --- for redirecting the codebuild project's stdout output
-    #   * *:errstream* (StringIO) --- for redirecting the codebuild project's stderr output
-    #   * *:sts_client* (Aws::STS::Client) --- STS client for providing credentials to CodeBuild image,
-    #     defaults to default client that uses the system configured AWS account.
-    #   * *:quiet* (Boolean) --- suppress debug output
-    #   * *:no_credentials* (Boolean) --- don't supply AWS credentials to the container
-
-    def initialize(opts = {})
-      @outstream  = opts[:outstream]
-      @errstream  = opts[:errstream]
-      @quiet      = opts[:quiet] || false
-      @sts_client = opts[:sts_client]
-      @no_creds   = opts[:no_credentials]
-    end
-
     # Run the CodeBuild project at the specified directory on the default AWS CodeBuild Ruby 2.3.1 image.
     #
     # @param path [String] The path to the CodeBuild project.
@@ -56,10 +30,11 @@ module CodeBuildLocal
     # @see run
     # @see CodeBuildLocal::DefaultImages.build_aws_codebuild_image
 
-    def run_default(path)
-      run(
+    def self.run_default path, opts={}
+      Runner.run(
         CodeBuildLocal::DefaultImages.build_code_build_image,
         CodeBuildLocal::SourceProvider::FolderSourceProvider.new(path),
+        opts
       )
     end
 
@@ -73,20 +48,38 @@ module CodeBuildLocal
     # @param image [Docker::Image] A docker image to run the CodeBuild project on.
     # @param source_provider [CodeBuildLocal::SourceProvider] A source provider that yields
     #   the source for the CodeBuild project.
-    # @param opts [Hash] A hash containing options:
+    # @param opts [Hash] A hash containing several optional values:
+    #   for redirecting output.
+    #   * *:outstream* (StringIO) --- for redirecting the codebuild project's stdout output
+    #   * *:errstream* (StringIO) --- for redirecting the codebuild project's stderr output
     #   * *:build_spec_path* (String) --- Path of the buildspec file (including filename )
     #     relative to the CodeBuild project root. Defaults to {DEFAULT_BUILD_SPEC_PATH}.
+    #   * *:sts_client* (Aws::STS::Client) --- STS client for providing credentials to CodeBuild image,
+    #     defaults to default client that uses the system configured AWS account.
+    #   * *:quiet* (Boolean) --- suppress debug output
+    #   * *:no_credentials* (Boolean) --- don't supply AWS credentials to the container
     #
     # @return [Integer] The exit code from running the CodeBuild project.
-
-    def run(image, source_provider, opts = {})
-      build_spec_path = opts[:build_spec_path] || DEFAULT_BUILD_SPEC_PATH
+    def self.run image, source_provider, opts = {}
+      runner = Runner.new image, source_provider, opts
       Runner.configure_docker
-      build_spec = Runner.make_build_spec(source_provider, build_spec_path)
-      env = Runner.make_env(build_spec, get_credentials)
-      container = Runner.make_container(image, source_provider, env)
+      runner.execute
+    end
 
+    # Run the code build project
+    #
+    # Parse the build_spec, create the environment from the build_spec and any configured credentials,
+    # and build a container. Then execute the build spec's commands on the container.
+    #
+    # This method will close and remove any containers it creates.
+    #
+    def execute
+      build_spec = Runner.make_build_spec(@source_provider, @build_spec_path)
+      env = Runner.make_env(build_spec, get_credentials)
+
+      container = nil
       begin
+        container = Runner.make_container(@image, @source_provider, env)
         run_commands_on_container(container, build_spec)
       ensure
         unless container.nil?
@@ -97,6 +90,31 @@ module CodeBuildLocal
     end
     
     private
+
+    # Create a Runner instance.
+    #
+    # @param opts [Hash] A hash containing several optional values,
+    #   for redirecting output.
+    #   * *:outstream* (StringIO) --- for redirecting the codebuild project's stdout output
+    #   * *:errstream* (StringIO) --- for redirecting the codebuild project's stderr output
+    #   * *:build_spec_path* (String) --- Path of the buildspec file (including filename )
+    #     relative to the CodeBuild project root. Defaults to {DEFAULT_BUILD_SPEC_PATH}.
+    #   * *:quiet* (Boolean) --- suppress debug output
+    #   * *:sts_client* (Aws::STS::Client) --- STS client for providing credentials to CodeBuild image,
+    #     defaults to default client that uses the system configured AWS account.
+    #   * *:no_credentials* (Boolean) --- don't supply AWS credentials to the container
+
+    def initialize image, source_provider, opts = {}
+      @image = image
+      @source_provider = source_provider
+      @outstream  = opts[:outstream]
+      @errstream  = opts[:errstream]
+      @build_spec_path = opts[:build_spec_path] || DEFAULT_BUILD_SPEC_PATH
+      @quiet      = opts[:quiet] || false
+      @sts_client = opts[:sts_client]
+      @no_creds   = opts[:no_credentials]
+    end
+
 
     DEFAULT_TIMEOUT_SECONDS = 2000
     REMOTE_SOURCE_VOLUME_PATH_RO="/usr/app_ro/"

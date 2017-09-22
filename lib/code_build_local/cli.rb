@@ -9,12 +9,9 @@ module CodeBuildLocal
     # @see CLI.optparse
 
     def run
-      path                = @options[:path]
-      quiet               = @options[:quiet] || false
-      build_spec_path     = @options[:build_spec_path]
-      image_id            = @options[:image_id]
-      aws_dockerfile_path = @options[:aws_dockerfile_path]
-      no_creds            = @options[:no_creds]
+      path                = @options.delete :path
+      image_id            = @options.delete :image_id
+      aws_dockerfile_path = @options.delete :aws_dockerfile_path
 
       # validate
       raise OptionParser::MissingArgument, 'Must specify a path (-p, --path PATH)' if path.nil?
@@ -30,10 +27,9 @@ module CodeBuildLocal
                 CodeBuildLocal::DefaultImages.build_code_build_image :aws_dockerfile_path => aws_dockerfile_path
               end
       source_provider = CodeBuildLocal::SourceProvider::FolderSourceProvider.new path
-      runner = make_runner :quiet => quiet, :no_creds => no_creds
 
       # run
-      runner.run image, source_provider, :build_spec_path => build_spec_path 
+      CodeBuildLocal::Runner.run image, source_provider, @options
     end
 
     # Create a CLI object, parsing the specified argv, or ARGV if none specified.
@@ -110,13 +106,6 @@ Arguments:
     private
 
     attr_reader :options
-
-    # Extension point for mocking interaction with runner
-
-    def make_runner opts={}
-      CodeBuildLocal::Runner.new opts
-    end
-
   end
 end
 
