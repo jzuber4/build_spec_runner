@@ -22,12 +22,12 @@ RSpec.describe Runner do
 
   describe "#run_default" do
 
-    DEFAULT_BUILDSPEC_DIR = File.join(FIXTURES_PATH, "default_name")
+    DEFAULT_DIR = File.join(FIXTURES_PATH, "default_name")
 
     context "Basic Run" do
       before :all do
         @runner = make_runner
-        @exit_code = @runner.run_default(DEFAULT_BUILDSPEC_DIR)
+        @exit_code = @runner.run_default(DEFAULT_DIR)
       end
 
       it "executes phases" do
@@ -62,8 +62,9 @@ RSpec.describe Runner do
 
   describe "#run" do
 
-    JAVA_IMAGE_BUILDSPEC_DIR = File.join(FIXTURES_PATH, "java_image")
+    JAVA_IMAGE_DIR = File.join(FIXTURES_PATH, "java_image")
     CUSTOM_BUILDSPEC_NAME_DIR = File.join(FIXTURES_PATH, "custom_name")
+    ECHO_CREDS_DIR = File.join(FIXTURES_PATH, "echo_creds")
     FILES_DIR = File.join(FIXTURES_PATH, "files")
     SHELL_ATTRIBUTES_DIR = File.join(FIXTURES_PATH, "shell")
 
@@ -71,7 +72,7 @@ RSpec.describe Runner do
       before :all do
         @runner = make_runner :quiet => true
         image = DefaultImages.build_code_build_image
-        @exit_code = @runner.run(image, FolderSourceProvider.new(DEFAULT_BUILDSPEC_DIR))
+        @exit_code = @runner.run(image, FolderSourceProvider.new(DEFAULT_DIR))
       end
 
       it "exits succesfully" do
@@ -91,7 +92,7 @@ RSpec.describe Runner do
     context "Relative source provider path" do
       before :all do
         @runner = make_runner
-        relative_dir = (Pathname.new DEFAULT_BUILDSPEC_DIR).relative_path_from(Pathname.new Dir.pwd)
+        relative_dir = (Pathname.new DEFAULT_DIR).relative_path_from(Pathname.new Dir.pwd)
         image = DefaultImages.build_code_build_image
         @exit_code = @runner.run(image, FolderSourceProvider.new(relative_dir))
       end
@@ -109,7 +110,7 @@ RSpec.describe Runner do
       before :all do
         @runner = make_runner
         image = DefaultImages.build_code_build_image({:aws_dockerfile_path => 'ubuntu/java/openjdk-8'})
-        @exit_code = @runner.run(image, FolderSourceProvider.new(JAVA_IMAGE_BUILDSPEC_DIR))
+        @exit_code = @runner.run(image, FolderSourceProvider.new(JAVA_IMAGE_DIR))
       end
 
       it "exits successfully" do
@@ -137,6 +138,47 @@ RSpec.describe Runner do
 
       it "yields correct output" do
         expect(@runner.outstream.string).to eq("so predictable\n")
+      end
+    end
+
+    context "No credentials" do
+      before :all do
+        @runner = make_runner :no_credentials => true
+        @exit_code = @runner.run(DefaultImages.build_code_build_image, FolderSourceProvider.new(ECHO_CREDS_DIR))
+      end
+
+      it "exits successfully" do
+        expect(@exit_code).to eq(0)
+      end
+
+      it "yields correct output" do
+        expect(@runner.outstream.string).to eq("\n\n\n") # no credentials to echo!
+      end
+    end
+
+    context "Custom STS client" do
+      # test exit code and output here, since CodeBuild runs are expensive and mocks shouldn't live outside of a single test execution
+      it "exits successfully and yields correct output" do
+        # expected key/secret/token
+        @aws_key = "not so secret key"
+        @aws_secret = "very secret, shhh!!"
+        @aws_token = "token/token/token/token/token/token/token/token/token/token/token/token/..."
+
+        # make mock client
+        @sts_client = double("sts_client")
+        @creds = double("credentials")
+        allow(@creds).to receive(:credentials) { { "AWS_ACCESS_KEY_ID" => @aws_key, "AWS_SECRET_ACCESS_KEY" => @aws_secret, "AWS_SESSION_TOKEN" => @aws_token} }
+        allow(@sts_client).to receive(:get_session_token) { @creds }
+
+        # make runner and execute
+        @runner = make_runner :sts_client => @sts_client
+        @exit_code = @runner.run(DefaultImages.build_code_build_image, FolderSourceProvider.new(ECHO_CREDS_DIR))
+
+        # expect
+        expect(@creds).to have_received(:credentials).with(no_args)
+        expect(@sts_client).to have_received(:get_session_token).with(no_args)
+        expect(@exit_code).to eq(0)
+        expect(@runner.outstream.string).to eq("\n\n\n") # no credentials to echo!
       end
     end
 

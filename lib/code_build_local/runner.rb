@@ -35,11 +35,17 @@ module CodeBuildLocal
     #   for redirecting output.
     #   * *:outstream* (StringIO) --- for redirecting the codebuild project's stdout output
     #   * *:errstream* (StringIO) --- for redirecting the codebuild project's stderr output
+    #   * *:sts_client* (Aws::STS::Client) --- STS client for providing credentials to CodeBuild image,
+    #     defaults to default client that uses the system configured AWS account.
+    #   * *:quiet* (Boolean) --- suppress debug output
+    #   * *:no_credentials* (Boolean) --- don't supply AWS credentials to the container
 
     def initialize(opts = {})
-      @outstream = opts[:outstream]
-      @errstream = opts[:errstream]
-      @quiet     = opts[:quiet] || false
+      @outstream  = opts[:outstream]
+      @errstream  = opts[:errstream]
+      @quiet      = opts[:quiet] || false
+      @sts_client = opts[:sts_client]
+      @no_creds   = opts[:no_credentials]
     end
 
     # Run the CodeBuild project at the specified directory on the default AWS CodeBuild Ruby 2.3.1 image.
@@ -77,7 +83,7 @@ module CodeBuildLocal
       build_spec_path = opts[:build_spec_path] || DEFAULT_BUILD_SPEC_PATH
       Runner.configure_docker
       build_spec = Runner.make_build_spec(source_provider, build_spec_path)
-      env = Runner.make_env(build_spec, Runner.get_credentials)
+      env = Runner.make_env(build_spec, get_credentials)
       container = Runner.make_container(image, source_provider, env)
 
       begin
@@ -97,12 +103,23 @@ module CodeBuildLocal
     REMOTE_SOURCE_VOLUME_PATH="/usr/app/"
 
     # Get credentials from AWS STS.
+    #
+    # If :no_credentials was passed into the constructor, returns an empty hash.
+    # Uses the supplied STS client, if :sts_client was specified. Otherwise uses the default
+    # STS client, based on the system configuration.
+    #
     # @see http://docs.aws.amazon.com/sdk-for-ruby/v3/api/Aws/STS/Client.html AWS STS Client
-    # @return [Hash] A hash containing session credentials for the globally configured AWS user,
-    #   see {make_env} for expected credential symbols.
+    # @return [Hash] A hash possibly containing session credentials for the globally configured AWS user,
+    #   see {make_env} for expected credential symbols. See above comments for possible values.
 
-    def self.get_credentials
-      Aws::STS::Client.new.get_session_token.credentials
+    def get_credentials
+      if @no_creds
+        {}
+      elsif @sts_client
+        @sts_client.get_session_token.credentials
+      else
+        Aws::STS::Client.new.get_session_token.credentials
+      end
     end
 
     # Make an array that contains environment variables according to the provided

@@ -14,6 +14,7 @@ module CodeBuildLocal
       build_spec_path     = @options[:build_spec_path]
       image_id            = @options[:image_id]
       aws_dockerfile_path = @options[:aws_dockerfile_path]
+      no_creds            = @options[:no_creds]
 
       # validate
       raise OptionParser::MissingArgument, 'Must specify a path (-p, --path PATH)' if path.nil?
@@ -29,7 +30,7 @@ module CodeBuildLocal
                 CodeBuildLocal::DefaultImages.build_code_build_image :aws_dockerfile_path => aws_dockerfile_path
               end
       source_provider = CodeBuildLocal::SourceProvider::FolderSourceProvider.new path
-      runner = make_runner :quiet => quiet
+      runner = make_runner :quiet => quiet, :no_creds => no_creds
 
       # run
       runner.run image, source_provider, :build_spec_path => build_spec_path 
