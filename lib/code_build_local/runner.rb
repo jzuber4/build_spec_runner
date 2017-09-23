@@ -272,6 +272,9 @@ module CodeBuildLocal
     # Make a shell script to imitate the behavior of the CodeBuild agent.
     #
     # This duplicates the running semantics of CodeBuild, including phase order, shell session, behavior, etc.
+    # Yes, this is very hacky. I'd love to hear of a better way that:
+    # * doesn't introduce dependencies on the host system
+    # * allows the build spec commands to run as if they were run consecutively in a single shell session
     #
     # @param build_spec [CodeBuildLocal::BuildSpec::BuildSpec] A build spec object containing the commands to run
     # @return [Array<String>] An array to execute an agent script that runs the CodeBuild project
