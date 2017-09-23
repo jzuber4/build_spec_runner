@@ -80,7 +80,6 @@ module CodeBuildLocal
         # TODO: remove this hack
         document = YAML.load_file(filename)
         if document.key? 'env' and document['env'].nil?
-          puts "hello"
           raise BuildSpecError.new('Mapping "env" requires mapping "variables"', filename)
         end
         for phase in PHASES

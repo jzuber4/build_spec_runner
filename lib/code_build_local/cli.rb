@@ -12,12 +12,16 @@ module CodeBuildLocal
       path                = @options.delete :path
       image_id            = @options.delete :image_id
       aws_dockerfile_path = @options.delete :aws_dockerfile_path
+      profile             = @options.delete :profile
 
       # validate
       raise OptionParser::MissingArgument, 'Must specify a path (-p, --path PATH)' if path.nil?
       if image_id && aws_dockerfile_path
         raise OptionParser::InvalidOption, 'Cannot specify both --aws_dockerfile_path and --image_id,'\
           ' you must choose one image.'
+      end
+      if profile && @options[:no_creds]
+        raise OptionParser::InvalidOption, 'Cannot specify both --no_creds and --profile'
       end
 
       # build
@@ -27,6 +31,7 @@ module CodeBuildLocal
                 CodeBuildLocal::DefaultImages.build_code_build_image :aws_dockerfile_path => aws_dockerfile_path
               end
       source_provider = CodeBuildLocal::SourceProvider::FolderSourceProvider.new path
+      @options[:sts_client] = Aws::STS::Client.new profile: profile if profile
 
       # run
       CodeBuildLocal::Runner.run image, source_provider, @options
@@ -50,6 +55,10 @@ module CodeBuildLocal
     # * \-p \-\-path PATH --- Required argument, path the to the CodeBuild project to run
     # * \-q \-\-quiet --- Silence debug messages.
     # * \-\-build_spec_path BUILD_SPEC_PATH --- Alternative path for buildspec file, defaults to {Runner::DEFAULT_BUILD_SPEC_PATH}.
+    # * \-\-profile --- AWS profile of the credentials to provide the container, defaults to the default profile.
+    #   This cannot be specified at the same time as \-\-no_creds.
+    # * \-\-no_creds --- Don't add AWS credentials to the CodeBuild project's container.
+    #   This cannot be specified at the same time as \-\-profile.
     # * \-\-image_id IMAGE_ID --- Id of alternative docker image to use. This cannot be specified at the same time as \-\-aws_dockerfile_path
     # * \-\-aws_dockerfile_path AWS_DOCKERFILE_PATH --- Alternative AWS CodeBuild Dockerfile path, defaults to {DefaultImages::DEFAULT_DOCKERFILE_PATH}.
     #   This cannot be specified at the same time as \-\-image_id.
@@ -72,6 +81,16 @@ module CodeBuildLocal
         opts.on('--build_spec_path BUILD_SPEC_PATH',
                 'Alternative path for buildspec file, defaults to #{Runner::DEFAULT_BUILD_SPEC_PATH}.') do |build_spec_path|
           options[:build_spec_path] = build_spec_path
+        end
+        opts.on('--profile PROFILE',
+                'AWS profile of the credentials to provide the container, defaults to the default profile. '\
+                'This cannot be set at the same time as --no_creds.') do |profile|
+          options[:profile] = profile
+        end
+        opts.on('--no_creds',
+                'Don\'t add AWS credentials to the CodeBuild project\'s container. '\
+                'This cannot be set at the same time as --profile.') do
+          options[:no_creds] = true
         end
         opts.on('--image_id IMAGE_ID',
                 'Id of alternative docker image to use. NOTE: this cannot be specified at the same time as --aws_dockerfile_path') do |image_id|

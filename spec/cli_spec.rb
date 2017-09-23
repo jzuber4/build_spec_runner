@@ -81,6 +81,26 @@ RSpec.describe CLI do
         expect(@opts).to have_key(:quiet)
         expect(@opts[:quiet]).to be_truthy
       end
+
+      it "Supports no_creds" do
+        @runner = mock_runner
+        @cli = CLI.new ["-p", TEST_PATH, "--no_creds"]
+        @cli.run
+        expect(@opts).to have_key(:no_creds)
+        expect(@opts[:no_creds]).to be_truthy
+      end
+
+      it "Supports profile" do
+        @runner = mock_runner
+        sts_class = class_double("Aws::STS::Client").as_stubbed_const(:transfer_nested_constants => true)
+        sts_client = double("sts_client")
+        expect(sts_class).to receive(:new).with(hash_including(:profile => "bob")) { sts_client }
+        @cli = CLI.new ["-p", TEST_PATH, "--profile", "bob"]
+        @cli.run
+
+        expect(@opts).to have_key(:sts_client)
+        expect(@opts[:sts_client]).to eq(sts_client)
+      end
     end
   end
 
