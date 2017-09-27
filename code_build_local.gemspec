@@ -10,7 +10,9 @@ Gem::Specification.new do |spec|
   spec.email         = ["jzuber4@gmail.com"]
 
   spec.summary       = %q{A gem to run AWS CodeBuild projects locally.}
-  spec.description   = %q{AWS CodeBuild (https://aws.amazon.com/codebuild/) is an AWS product. This gem is a third-party creation not affiliated with AWS.}
+  spec.description   = %q{A gem to run AWS CodeBuild projects locally.
+AWS CodeBuild (https://aws.amazon.com/codebuild/) is an AWS product. This gem is a third-party creation not affiliated with AWS.
+}
   spec.homepage      = "https://github.com/jzuber4/code_build_local"
   spec.license       = "MIT"
 
