@@ -13,6 +13,12 @@ mapping:
         mapping:
           =:
             type: text
+      "parameter-store":
+        type: map
+        mapping:
+          =:
+            type: text
+
   "phases":
     type: map
     required: true

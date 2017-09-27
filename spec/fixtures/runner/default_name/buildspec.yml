@@ -10,6 +10,8 @@ env:
     ERR2: "err2"
     ERR3: "err3"
     ERR4: "err4"
+  parameter-store:
+    PARAM: "param"
 
 phases:
   install:

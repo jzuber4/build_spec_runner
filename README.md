@@ -8,7 +8,7 @@ CodeBuildLocal is a utility for reproducing [AWS CodeBuild](https://aws.amazon.c
 
 Currently *unsupported* features:
 
-* Amazon EC2 Systems Manager Parameter Store -- CodeBuildLocal will **fail** if it sees "parameter-store" under "env"
+* Amazon EC2 Systems Manager Parameter Store -- CodeBuildLocal will ignore any variables declared in "parameter-store" under "env"
 * Build artifact export -- CodeBuildLocal will not export your build artifacts. It essentially ignores the "artifacts" section of the Build Spec file.
 * [Build Environment Variables](http://docs.aws.amazon.com/codebuild/latest/userguide/build-env-ref-env-vars.html) -- CodeBuildLocal does not specify all the same environment variables as AWS CodeBuild. It does support environment variables declared in the Build Spec file.
 

@@ -17,7 +17,10 @@ RSpec.describe BuildSpec do
   def all_defined
     {
       :version => 0.2,
-      :env => { 'var1' => "value1", 'var2' => "value2", 'var3' => "value3", },
+      :env => {
+        :variables => { 'var1' => "value1", 'var2' => "value2", 'var3' => "value3", },
+        :parameter_store => { 'param_one' => 'blabla', 'param_two' => 'blablabla' },
+      },
       :phases => {
         'install'    => ['cmd1',  'cmd2',  'cmd3'],
         'pre_build'  => ['cmd4',  'cmd5',  'cmd6'],
@@ -35,7 +38,7 @@ RSpec.describe BuildSpec do
     end
 
     it "has env" do
-      expect(@buildspec.env).to eq(@spec_opts[:env])
+      expect(@buildspec.env).to eq(@spec_opts[:env][:variables])
     end
 
     it "has all phases" do
@@ -59,6 +62,11 @@ RSpec.describe BuildSpec do
     end
 
     # These aren't currently in the buildspec API, so just check that it parses correctly
+
+    it "has no parameter-store variables" do
+      spec_opts = all_defined.tap{|o| o[:env].delete(:parameter_store)}
+      BuildSpecHelper.make_buildspec spec_opts
+    end
 
     it "Missing artifacts" do
       spec_opts = all_defined.tap{|o| o.delete(:artifacts)}
@@ -148,6 +156,18 @@ RSpec.describe BuildSpec do
 
     it "Non string variable under env" do
       bad_file_contents = BASE_BAD_FILE_CONTENTS + "env:\n  variables:\n    variable:\n      mapping: true\n"
+      buildspec_file = BuildSpecHelper.make_buildspec_file bad_file_contents
+      expect{BuildSpec.new buildspec_file}.to raise_error(BuildSpecError)
+    end
+
+    it "Empty env parameter-store" do
+      bad_file_contents = BASE_BAD_FILE_CONTENTS + "env:\n  variables:\n    variable: bla\n  parameter-store:\n"
+      buildspec_file = BuildSpecHelper.make_buildspec_file bad_file_contents
+      expect{BuildSpec.new buildspec_file}.to raise_error(BuildSpecError)
+    end
+
+    it "Non string variable under parameter-store" do
+      bad_file_contents = BASE_BAD_FILE_CONTENTS + "env:\n  variables:\n    variable: bla\n  parameter-store:\n    mapping: true\n"
       buildspec_file = BuildSpecHelper.make_buildspec_file bad_file_contents
       expect{BuildSpec.new buildspec_file}.to raise_error(BuildSpecError)
     end

@@ -82,6 +82,9 @@ module CodeBuildLocal
         if document.key? 'env' and document['env'].nil?
           raise BuildSpecError.new('Mapping "env" requires mapping "variables"', filename)
         end
+        if document.key? 'env' and document['env'].key? 'parameter-store' and document['env']['parameter-store'].nil?
+          raise BuildSpecError.new('Mapping "env => parameter-store" requires at least one entry, if it exists', filename)
+        end
         for phase in PHASES
           if document['phases'].key? phase and document['phases'][phase].nil?
             raise BuildSpecError.new("Mapping \"phases => #{phase}\" requires mapping \"commands\"", filename)

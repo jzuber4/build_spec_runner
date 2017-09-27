@@ -10,8 +10,17 @@ module BuildSpecHelper
   end
 
   def self.make_env env
-    output = "env:\n  variables:\n"
-    env.keys.each{|k| output << "    #{k}: #{env[k]}\n"}
+    output = "env:\n"
+    if env.has_key? :variables
+      variables = env[:variables]
+      output << "  variables:\n"
+      variables.keys.each{|k| output << "    #{k}: #{variables[k]}\n"}
+    end
+    if env.has_key? :parameter_store
+      params = env[:variables]
+      output << "  parameter-store:\n"
+      params.keys.each{|k| output << "    #{k}: #{params[k]}\n"}
+    end
     output
   end
 
