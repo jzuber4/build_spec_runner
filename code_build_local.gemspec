@@ -28,8 +28,8 @@ AWS CodeBuild (https://aws.amazon.com/codebuild/) is an AWS product. This gem is
   spec.add_dependency 'git', '~> 1.3'
   spec.add_dependency 'kwalify', '~> 0.7'
   spec.add_development_dependency "bundler", "~> 1.15"
-  spec.add_development_dependency 'pry', '~> 0.10'
-  spec.add_development_dependency "rake", "~> 10.0"
+  spec.add_development_dependency 'pry', '~> 0.11'
+  spec.add_development_dependency "rake", "~> 12.1"
   spec.add_development_dependency "rspec", "~> 3.6"
   spec.add_development_dependency "yard", "~> 0.9"
 end
