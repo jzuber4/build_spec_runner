@@ -1,6 +1,16 @@
 # CodeBuildLocal
 
+[![Gem Version](https://img.shields.io/gem/v/code_build_local.svg)](https://rubygems.org/gems/code_build_local)
+[![Code Climate](https://img.shields.io/codeclimate/github/jzuber4/code_build_local.svg)](https://codeclimate.com/github/jzuber4/code_build_local)
+[![Gemnasium](https://img.shields.io/gemnasium/jzuber4/code_build_local.svg)](https://gemnasium.com/github.com/jzuber4/code_build_local/)
+
 CodeBuildLocal is a utility for reproducing [AWS CodeBuild](https://aws.amazon.com/codebuild/) executions locally. It does so by running the CodeBuild project locally with Docker, trying to mirror the execution semantics of CodeBuild as much as possible. It is primarily useful as a CLI utility but can also be used as a library.
+
+Currently *unsupported* features:
+
+* Amazon EC2 Systems Manager Parameter Store -- CodeBuildLocal will **fail** if it sees "parameter-store" under "env"
+* Build artifact export -- CodeBuildLocal will not export your build artifacts. It essentially ignores the "artifacts" section of the Build Spec file.
+* [Build Environment Variables](http://docs.aws.amazon.com/codebuild/latest/userguide/build-env-ref-env-vars.html) -- CodeBuildLocal does not specify all the same environment variables as AWS CodeBuild. It does support environment variables declared in the Build Spec file.
 
 ## Installation
 
