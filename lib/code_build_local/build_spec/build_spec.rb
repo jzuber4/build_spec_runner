@@ -80,7 +80,10 @@ module CodeBuildLocal
         # TODO: remove this hack
         document = YAML.load_file(filename)
         if document.key? 'env' and document['env'].nil?
-          raise BuildSpecError.new('Mapping "env" requires mapping "variables"', filename)
+          raise BuildSpecError.new('Mapping "env" requires at least one of ["variables", "parameter-store"]', filename)
+        end
+        if document.key? 'env' and document['env'].key? 'variables' and document['env']['variables'].nil?
+          raise BuildSpecError.new('Mapping "env => variables" requires at least one entry, if it exists', filename)
         end
         if document.key? 'env' and document['env'].key? 'parameter-store' and document['env']['parameter-store'].nil?
           raise BuildSpecError.new('Mapping "env => parameter-store" requires at least one entry, if it exists', filename)

@@ -9,7 +9,6 @@ mapping:
     mapping:
       "variables":
         type: map
-        required: true
         mapping:
           =:
             type: text

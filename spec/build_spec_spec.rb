@@ -142,7 +142,7 @@ RSpec.describe BuildSpec do
       expect{BuildSpec.new buildspec_file}.to raise_error(BuildSpecError)
     end
 
-    it "Missing env variables" do
+    it "Missing env mappings" do
       bad_file_contents = BASE_BAD_FILE_CONTENTS + "env:\n"
       buildspec_file = BuildSpecHelper.make_buildspec_file bad_file_contents
       expect{BuildSpec.new buildspec_file}.to raise_error(BuildSpecError)

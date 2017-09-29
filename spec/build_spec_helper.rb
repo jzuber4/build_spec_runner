@@ -17,7 +17,7 @@ module BuildSpecHelper
       variables.keys.each{|k| output << "    #{k}: #{variables[k]}\n"}
     end
     if env.has_key? :parameter_store
-      params = env[:variables]
+      params = env[:parameter_store]
       output << "  parameter-store:\n"
       params.keys.each{|k| output << "    #{k}: #{params[k]}\n"}
     end
