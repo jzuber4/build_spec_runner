@@ -30,11 +30,13 @@ module CodeBuildLocal
 
       # @!attribute [r] env
       #   @return [Map<String, String>] A mapping of environment variable names to values.
+      # @!attribute [r] paremeter_store
+      #   @return [Map<String, String>] A mapping of parameter store environment variable names to the parameter store key.
       # @!attribute [r] phases
       #   @return [Map<String, Array<String>>] A mapping of phase name to a list of commands
       #   for that phase
 
-      attr_reader :env, :phases
+      attr_reader :env, :parameter_store, :phases
 
       # Parse a buildspec file to create a BuildSpec object. Parses the file according to a
       # buildspec schema.
@@ -67,6 +69,11 @@ module CodeBuildLocal
         @env = document['env']['variables'] if document['env'] and document['env']['variables']
         @env ||= {}
         @env.freeze
+
+        # parse env
+        @parameter_store = document['env']['parameter-store'] if document['env'] and document['env']['parameter-store']
+        @parameter_store ||= {}
+        @parameter_store.freeze
 
         # parse phases
         @phases = {}

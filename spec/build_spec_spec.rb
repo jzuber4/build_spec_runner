@@ -41,6 +41,10 @@ RSpec.describe BuildSpec do
       expect(@buildspec.env).to eq(@spec_opts[:env][:variables])
     end
 
+    it "has parameter-store" do
+      expect(@buildspec.parameter_store).to eq(@spec_opts[:env][:parameter_store])
+    end
+
     it "has all phases" do
       expect_buildspec_to_match_spec_opts @buildspec, @spec_opts
     end

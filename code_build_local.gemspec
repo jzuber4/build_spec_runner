@@ -24,6 +24,7 @@ AWS CodeBuild (https://aws.amazon.com/codebuild/) is an AWS product. This gem is
   spec.require_paths = ["lib"]
 
   spec.add_dependency 'aws-sdk-core', '~> 3'
+  spec.add_dependency 'aws-sdk-ssm', '~> 1.1'
   spec.add_dependency 'docker-api', '~> 1.33'
   spec.add_dependency 'git', '~> 1.3'
   spec.add_dependency 'kwalify', '~> 0.7'

@@ -1,3 +1,4 @@
+require 'aws-sdk-core'
 require 'spec_helper'
 require 'docker'
 
@@ -12,6 +13,7 @@ RSpec.describe CLI do
   TEST_BUILD_SPEC_PATH = './foo/bar/spec.yml'
   TEST_IMAGE = 'some_id'
   TEST_AWS_DOCKERFILE_PATH = 'ubuntu/java/openjdk-8'
+  SSM_VALUE = 'expected this value'
 
   def mock_runner
     runner = class_double("CodeBuildLocal::Runner").as_stubbed_const(:transfer_nested_constants => true)
@@ -104,15 +106,24 @@ RSpec.describe CLI do
     end
   end
 
+  let(:stub_ssm) do
+    stub_ssm
+  end
+
   # it's hard to inject test dependencies in a main function, so just test that it outputs what we expect
   describe ".main" do
+
+    let(:stub_ssm) { Aws::SSM::Client.new(stub_responses: true) }
     it "works as expected" do
+      stub_ssm.stub_responses(:get_parameter, { :parameter => { :value => SSM_VALUE } })
+      expect(Aws::SSM::Client).to receive(:new).and_return(stub_ssm)
+
       # ignore warning for redefining ARGV constant
       warn_level = $VERBOSE
       $VERBOSE = nil
       ARGV = ['-p', TEST_PATH, '--quiet']
       $VERBOSE = warn_level
-      expect {expect {CLI.main}.to output("value1\nvalue2\nvalue3\nvalue4\n").to_stdout}.to output("err1\nerr2\nerr3\nerr4\n").to_stderr
+      expect {expect {CLI.main}.to output("value1\nvalue2\n#{SSM_VALUE}\nvalue3\nvalue4\n").to_stdout}.to output("err1\nerr2\nerr3\nerr4\n").to_stderr
     end
   end
 end

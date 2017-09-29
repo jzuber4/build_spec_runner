@@ -11,7 +11,7 @@ env:
     ERR3: "err3"
     ERR4: "err4"
   parameter-store:
-    PARAM: "param"
+    PARAM: "stubbed_parameter"
 
 phases:
   install:
@@ -24,6 +24,7 @@ phases:
       - ">&2 echo $ERR2"
   build:
     commands:
+      - echo $PARAM
       - echo $VAR3
       - ">&2 echo $ERR3"
   post_build:

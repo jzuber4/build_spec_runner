@@ -1,4 +1,5 @@
 require 'aws-sdk-core'
+require 'aws-sdk-ssm'
 require 'docker'
 require 'pathname'
 require 'shellwords'
@@ -75,7 +76,7 @@ module CodeBuildLocal
     #
     def execute
       build_spec = Runner.make_build_spec(@source_provider, @build_spec_path)
-      env = Runner.make_env(build_spec, get_credentials)
+      env = make_env(build_spec)
 
       container = nil
       begin
@@ -111,61 +112,48 @@ module CodeBuildLocal
       @errstream  = opts[:errstream]
       @build_spec_path = opts[:build_spec_path] || DEFAULT_BUILD_SPEC_PATH
       @quiet      = opts[:quiet] || false
-      @sts_client = opts[:sts_client]
       @no_creds   = opts[:no_credentials]
+      @sts_client = if @no_creds
+                      nil
+                    elsif opts[:sts_client]
+                      opts[:sts_client]
+                    else
+                      Aws::STS::Client.new
+                    end
     end
-
 
     DEFAULT_TIMEOUT_SECONDS = 2000
     REMOTE_SOURCE_VOLUME_PATH_RO="/usr/app_ro/"
     REMOTE_SOURCE_VOLUME_PATH="/usr/app/"
 
-    # Get credentials from AWS STS.
-    #
-    # If :no_credentials was passed into the constructor, returns an empty hash.
-    # Uses the supplied STS client, if :sts_client was specified. Otherwise uses the default
-    # STS client, based on the system configuration.
-    #
-    # @see http://docs.aws.amazon.com/sdk-for-ruby/v3/api/Aws/STS/Client.html AWS STS Client
-    # @return [Hash] A hash possibly containing session credentials for the globally configured AWS user,
-    #   see {make_env} for expected credential symbols. See above comments for possible values.
-
-    def get_credentials
-      if @no_creds
-        {}
-      elsif @sts_client
-        @sts_client.get_session_token.credentials
-      else
-        Aws::STS::Client.new.get_session_token.credentials
-      end
-    end
-
     # Make an array that contains environment variables according to the provided
-    # build_spec and credentials.
+    # build_spec and sts client configuration.
     #
     # @param build_spec [CodeBuildLocal::BuildSpec::BuildSpec]
-    # @param credentials [Hash] A hash containing AWS credential information.
-    #   :access_key_id should contain the AWS access key id.
-    #   :secret_access_key should contain the AWS secret access key.
-    #   :session_token should contain the AWS session token, if applicable.
     #
     # @return [Array<String>] An array of env variables in the format KEY=FOO, KEY2=BAR
 
-    def self.make_env(build_spec, credentials)
+    def make_env(build_spec)
       env = []
 
-      # load credentials, if they are specified
-      unless credentials[:access_key_id].nil?
-        env << "AWS_ACCESS_KEY_ID=#{credentials[:access_key_id]}"
-      end
-      unless credentials[:secret_access_key].nil?
-        env << "AWS_SECRET_ACCESS_KEY=#{credentials[:secret_access_key]}"
-      end
-      unless credentials[:session_token].nil?
-        env << "AWS_SESSION_TOKEN=#{credentials[:session_token]}"
-      end
-
       build_spec.env.keys.each { |k| env << "#{k}=#{build_spec.env[k]}" }
+
+      unless @sts_client.nil?
+        session_token = @sts_client.get_session_token
+        credentials = session_token.credentials
+
+        env << "AWS_ACCESS_KEY_ID=#{credentials[:access_key_id]}"
+        env << "AWS_SECRET_ACCESS_KEY=#{credentials[:secret_access_key]}"
+        env << "AWS_SESSION_TOKEN=#{credentials[:session_token]}"
+
+        ssm = Aws::SSM::Client.new(credentials: session_token)
+        build_spec.parameter_store.keys.each do |k|
+          name = build_spec.parameter_store[k]
+          param_value = ssm.get_parameter(:name => name, :with_decryption => true).parameter.value
+          env << "#{k}=#{param_value}"
+        end
+
+      end
 
       env
     end

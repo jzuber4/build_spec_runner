@@ -1,0 +1,16 @@
+version: 0.2
+
+env:
+  parameter-store:
+    PARAM1: "firstParam"
+    PARAM2: "secondParam"
+    PARAM3: "thirdParam"
+    PARAM4: "fourthParam"
+
+phases:
+  install:
+    commands:
+      - echo $PARAM1
+      - echo $PARAM2
+      - echo $PARAM3
+      - echo $PARAM4

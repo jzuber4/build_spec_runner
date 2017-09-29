@@ -9,6 +9,8 @@ RSpec.describe Runner do
 
   FIXTURES_PATH = File.join(File.dirname(__FILE__), "fixtures/runner")
 
+  SSM_VALUES = ["ssm value 1", "ssm value 2", "ssm value 3", "ssm value 4"]
+
   def add_streams opts
     @outstream = StringIO.new
     @errstream = StringIO.new
@@ -28,6 +30,19 @@ RSpec.describe Runner do
 
   before :all do
     @default_image = DefaultImages.build_code_build_image
+
+    Aws.config[:ssm] = {
+      :stub_responses => {
+        :get_parameter => [
+          { :parameter => { :value => SSM_VALUES[0] } },
+          { :parameter => { :value => SSM_VALUES[1] } },
+          { :parameter => { :value => SSM_VALUES[2] } },
+          { :parameter => { :value => SSM_VALUES[3] } },
+        ]
+      }
+    }
+
+    @default_output = "value1\nvalue2\n#{SSM_VALUES[0]}\nvalue3\nvalue4\n"
   end
 
   describe "#run_default" do
@@ -40,7 +55,7 @@ RSpec.describe Runner do
       end
 
       it "executes phases" do
-        expect(@outstream.string).to eq("value1\nvalue2\nvalue3\nvalue4\n")
+        expect(@outstream.string).to eq(@default_output)
       end
 
       it "exits successfully" do
@@ -72,6 +87,7 @@ RSpec.describe Runner do
   describe "#run" do
 
     JAVA_IMAGE_DIR = File.join(FIXTURES_PATH, "java_image")
+    PARAMETER_STORE_DIR = File.join(FIXTURES_PATH, "parameter_store")
     CUSTOM_BUILDSPEC_NAME_DIR = File.join(FIXTURES_PATH, "custom_name")
     ECHO_CREDS_DIR = File.join(FIXTURES_PATH, "echo_creds")
     FILES_DIR = File.join(FIXTURES_PATH, "files")
@@ -79,8 +95,7 @@ RSpec.describe Runner do
 
     context "Quiet" do
       before :all do
-        image = DefaultImages.build_code_build_image
-        @exit_code = run image, FolderSourceProvider.new(DEFAULT_DIR), :quiet => true
+        @exit_code = run @default_image, FolderSourceProvider.new(DEFAULT_DIR), :quiet => true
       end
 
       it "exits succesfully" do
@@ -88,7 +103,7 @@ RSpec.describe Runner do
       end
 
       it "outputs correct stdout and stderr" do
-        expect(@outstream.string).to eq("value1\nvalue2\nvalue3\nvalue4\n")
+        expect(@outstream.string).to eq(@default_output)
         expect(@errstream.string).to eq("err1\nerr2\nerr3\nerr4\n")
       end
 
@@ -100,8 +115,7 @@ RSpec.describe Runner do
     context "Relative source provider path" do
       before :all do
         relative_dir = (Pathname.new DEFAULT_DIR).relative_path_from(Pathname.new Dir.pwd)
-        image = DefaultImages.build_code_build_image
-        @exit_code = run image, FolderSourceProvider.new(relative_dir)
+        @exit_code = run @default_image, FolderSourceProvider.new(relative_dir)
       end
 
       it "exits succesfully" do
@@ -109,7 +123,7 @@ RSpec.describe Runner do
       end
 
       it "outputs correct stdout" do
-        expect(@outstream.string).to eq("value1\nvalue2\nvalue3\nvalue4\n")
+        expect(@outstream.string).to eq(@default_output)
       end
     end
 
@@ -130,11 +144,24 @@ RSpec.describe Runner do
       end
     end
 
+    context "Parameter store" do
+      before :all do
+        @exit_code = run @default_image, FolderSourceProvider.new(PARAMETER_STORE_DIR)
+      end
+
+      it "exits successfully" do
+        expect(@exit_code).to eq(0)
+      end
+
+      it "yields correct output" do
+        expect(@outstream.string).to eq(SSM_VALUES.join("\n") + "\n")
+      end
+    end
+
     context "Custom buildspec name" do
       before :all do
-        image = DefaultImages.build_code_build_image
         build_spec_path = "my_spec_file.yml"
-        @exit_code = run image, FolderSourceProvider.new(CUSTOM_BUILDSPEC_NAME_DIR), :build_spec_path => build_spec_path
+        @exit_code = run @default_image, FolderSourceProvider.new(CUSTOM_BUILDSPEC_NAME_DIR), :build_spec_path => build_spec_path
       end
 
       it "exits successfully" do
@@ -148,7 +175,7 @@ RSpec.describe Runner do
 
     context "No credentials" do
       before :all do
-        @exit_code = run DefaultImages.build_code_build_image, FolderSourceProvider.new(ECHO_CREDS_DIR), :no_credentials => true
+        @exit_code = run @default_image, FolderSourceProvider.new(ECHO_CREDS_DIR), :no_credentials => true
       end
 
       it "exits successfully" do
@@ -171,17 +198,17 @@ RSpec.describe Runner do
         # make mock client
         @sts_client = double("sts_client")
         @creds = double("credentials")
-        allow(@creds).to receive(:credentials) { { "AWS_ACCESS_KEY_ID" => @aws_key, "AWS_SECRET_ACCESS_KEY" => @aws_secret, "AWS_SESSION_TOKEN" => @aws_token} }
+        allow(@creds).to receive(:credentials) { { :access_key_id => @aws_key, :secret_access_key => @aws_secret, :session_token => @aws_token} }
         allow(@sts_client).to receive(:get_session_token) { @creds }
 
         # make runner and execute
-        @exit_code = run DefaultImages.build_code_build_image, FolderSourceProvider.new(ECHO_CREDS_DIR), :sts_client => @sts_client
+        @exit_code = run @default_image, FolderSourceProvider.new(ECHO_CREDS_DIR), :sts_client => @sts_client
 
         # expect
         expect(@creds).to have_received(:credentials).with(no_args)
         expect(@sts_client).to have_received(:get_session_token).with(no_args)
         expect(@exit_code).to eq(0)
-        expect(@outstream.string).to eq("\n\n\n") # no credentials to echo!
+        expect(@outstream.string).to eq("#{@aws_key}\n#{@aws_secret}\n#{@aws_token}\n")
       end
     end
 
