@@ -42,66 +42,105 @@ module CodeBuildLocal
       # buildspec schema.
 
       def initialize filename
-        parse_file filename
+        @filename = filename
+        parse_file
       end
 
       private
 
-      def parse_file filename
+      # The filename of the build spec file, used for raising {BuildSpecError}s
+
+      attr_reader :filename
+
+      # Parse a buildspec yaml file to create a BuildSpec object. Uses a Kwalify schema for validation
+
+      def parse_file
+        document = YAML.load_file @filename
+        validate_with_schema document
+
+        validate_version document
+        @env, @parameter_store = validate_env document 
+        @phases          = validate_phases document
+        validate_artifacts document
+      end
+
+      # Validate the buildspec file using a Kwalify schema
+      #
+      # @param document [Hash] a document object representing the build spec
+      # @raise [BuildSpecError] if the build spec doesn't comply with the schema
+
+      def validate_with_schema document
         schema_filename = File.join(File.dirname(__FILE__), './buildspec_schema.yml')
         schema = Kwalify::Yaml.load_file(schema_filename)
-        validator = Kwalify::Validator.new(schema)
-        parser = Kwalify::Yaml::Parser.new(validator)
 
-        document = parser.parse_file(filename)
+        errors = Kwalify::Validator.new(schema).validate document
+        if errors && !errors.empty?
+          raise BuildSpecError.new "Encountered errors while validating buildspec according to schema: #{errors}", @filename
+        end
+      end
 
+      # Validate the build spec document's version
+      #
+      # @raise [BuildSpecError] if the version is not supported
+
+      def validate_version document
         version = document['version']
         if version != 0.2
-          raise BuildSpecError.new("Unsupported version: #{version}. This only supports 0.2", filename)
+          raise BuildSpecError.new "Unsupported version: #{version}. This only supports 0.2", @filename
         end
+      end
 
-        errors = parser.errors
-        if errors && !errors.empty?
-          raise BuildSpecError.new("Encountered errors while validating buildspec: #{errors}", filename)
-        end
+      # Validate and parse the build spec document's environment variables and parameter-store variables
+      #
+      # @raise [BuildSpecError] if the env variables or paremeter-store variables are invalid
+      # @return [Array<String>, Array<String>] the environment variables and parameter store variables, in that order
 
-        # parse env
-        @env = document['env']['variables'] if document['env'] and document['env']['variables']
-        @env ||= {}
-        @env.freeze
+      def validate_env document
+        assert_not_nil_key document, 'env', 'Mapping "env" requires at least one of ["variables", "parameter-store"]'
 
-        # parse env
-        @parameter_store = document['env']['parameter-store'] if document['env'] and document['env']['parameter-store']
-        @parameter_store ||= {}
-        @parameter_store.freeze
+        assert_not_nil_key document['env'], 'variables', 'Mapping "env => variables" requires at least one entry, if it exists'
+        env = document['env']['variables'] if document['env'] and document['env']['variables']
+        env ||= {}
+        env.freeze
 
-        # parse phases
-        @phases = {}
+        assert_not_nil_key document['env'], 'parameter-store', 'Mapping "env => parameter-store" requires at least one entry, if it exists'
+        parameter_store = document['env']['parameter-store'] if document['env'] and document['env']['parameter-store']
+        parameter_store ||= {}
+        parameter_store.freeze
+
+        return env, parameter_store
+      end
+
+      # Validate and parse the build spec document's phases
+      #
+      # @raise [BuildSpecError] if the phase mappings are  invalid
+      # @return [Hash<String, Array[String]>] a mapping of phase name to a list of commands in that phase
+
+      def validate_phases document
+        phases = {}
         for phase in PHASES
-          @phases[phase] = document['phases'][phase]['commands'] unless document['phases'][phase].nil?
-          @phases[phase] ||= []
+          assert_not_nil_key document['phases'], phase, "Mapping \"phases => #{phase}\" requires mapping \"commands\""
+          phases[phase] = document['phases'][phase]['commands'] unless document['phases'][phase].nil?
+          phases[phase] ||= []
         end
-        @phases.freeze
+        phases
+      end
 
-        # Validate some things that kwalify doesn't catch
-        # TODO: remove this hack
-        document = YAML.load_file(filename)
-        if document.key? 'env' and document['env'].nil?
-          raise BuildSpecError.new('Mapping "env" requires at least one of ["variables", "parameter-store"]', filename)
-        end
-        if document.key? 'env' and document['env'].key? 'variables' and document['env']['variables'].nil?
-          raise BuildSpecError.new('Mapping "env => variables" requires at least one entry, if it exists', filename)
-        end
-        if document.key? 'env' and document['env'].key? 'parameter-store' and document['env']['parameter-store'].nil?
-          raise BuildSpecError.new('Mapping "env => parameter-store" requires at least one entry, if it exists', filename)
-        end
-        for phase in PHASES
-          if document['phases'].key? phase and document['phases'][phase].nil?
-            raise BuildSpecError.new("Mapping \"phases => #{phase}\" requires mapping \"commands\"", filename)
-          end
-        end
-        if document.key? 'artifacts' and document['artifacts'].nil?
-          raise BuildSpecError.new('Mapping "artifacts" requires mapping "files"', filename)
+      # Validate the build spec document's artifacts
+      #
+      # @raise [BuildSpecError] if the artifact mapping is invalid
+
+      def validate_artifacts document
+        assert_not_nil_key document, 'artifacts', 'Mapping "artifacts" requires mapping "files"'
+      end
+
+      # Assert that the document does not have the key with a nil value
+      #
+      # @raise [BuildSpecError] If the document has the key but the key's value is nil
+
+      def assert_not_nil_key document, key, message
+        if !document.nil? and document.key? key and document[key].nil?
+          raise BuildSpecError.new message, @filename
         end
       end
     end
