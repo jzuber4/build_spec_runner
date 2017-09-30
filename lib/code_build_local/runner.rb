@@ -300,8 +300,8 @@ module CodeBuildLocal
 
     # Create CodeBuild shell agent commands for the given phase
     #
-    # @param [CodeBuildLocal::BuildSpec::BuildSpec] the build spec object from which to read the commands
-    # @param [String] the phase to run
+    # @param build_spec [CodeBuildLocal::BuildSpec::BuildSpec] the build spec object from which to read the commands
+    # @param phase [String] the phase to run
     # @return [Array<String>] a list of commands to run for the given phase
 
     def agent_phase_commands build_spec, phase
