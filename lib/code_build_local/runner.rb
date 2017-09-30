@@ -260,57 +260,84 @@ module CodeBuildLocal
     # Make a shell script to imitate the behavior of the CodeBuild agent.
     #
     # This duplicates the running semantics of CodeBuild, including phase order, shell session, behavior, etc.
-    # Yes, this is very hacky. I'd love to hear of a better way that:
+    # Yes, this is very hacky. I'd love to find a better way that:
     # * doesn't introduce dependencies on the host system
     # * allows the build spec commands to run as if they were run consecutively in a single shell session
+    # Better features could include:
+    # * Remote control of agent on container
+    # * Separate streams for output, errors, and debug messages
     #
     # @param build_spec [CodeBuildLocal::BuildSpec::BuildSpec] A build spec object containing the commands to run
     # @return [Array<String>] An array to execute an agent script that runs the CodeBuild project
     
     def make_agent_script build_spec
-      # Setup the container. Copy project to a writable dir, go to the dir, set bookkeeping vars
-      commands = [
+      commands = agent_setup_commands
+
+      CodeBuildLocal::BuildSpec::PHASES.each do |phase|
+        commands.push(*agent_phase_commands(build_spec, phase))
+      end
+
+      ["bash", "-c", commands.join("\n")]
+    end
+
+    # Create the setup commands for the CodeBuild shell agent script
+    # The setup commands:
+    # * Copy project to a writable dir
+    # * Move to the dir
+    # * Set bookkeeping vars
+    #
+    # @return [Array<String>] The list of commands to setup the agent
+
+    def agent_setup_commands
+      [
         "cp -r #{REMOTE_SOURCE_VOLUME_PATH_RO} #{REMOTE_SOURCE_VOLUME_PATH}",
         "cd #{REMOTE_SOURCE_VOLUME_PATH}",
         "#{DO_NEXT}=\"0\"",
         "#{EXIT_CODE}=\"0\"",
         "#{BUILD_EXIT_CODE}=\"0\"",
       ]
+    end
 
-      CodeBuildLocal::BuildSpec::PHASES.each do |phase|
-        commands << debug_message("Running phase \\\"#{phase}\\\"")
+    # Create CodeBuild shell agent commands for the given phase
+    #
+    # @param [CodeBuildLocal::BuildSpec::BuildSpec] the build spec object from which to read the commands
+    # @param [String] the phase to run
+    # @return [Array<String>] a list of commands to run for the given phase
 
-        build_spec.phases[phase].each do |cmd|
-          # Run the given command, continue if the command exits successfully
-          commands << debug_message("Running command \\\"#{cmd.shellescape}\\\"")
-          commands << maybe_command("#{cmd} ; #{EXIT_CODE}=\"$?\"")
-          commands << maybe_command(
-            make_if(EXIT_CODE, nil, [
-              "#{DO_NEXT}=\"$#{EXIT_CODE}\"",
-              debug_message("Command failed \\\"#{cmd.shellescape}\\\""),
-            ].join("\n"))
-          )
-        end
+    def agent_phase_commands build_spec, phase
+      commands = []
+      commands << debug_message("Running phase \\\"#{phase}\\\"")
 
-        commands << make_if(
-          EXIT_CODE,
-          debug_message("Completed phase \\\"#{phase}\\\", successful: true"),
-          debug_message("Completed phase \\\"#{phase}\\\", successful: false"),
+      build_spec.phases[phase].each do |cmd|
+        # Run the given command, continue if the command exits successfully
+        commands << debug_message("Running command \\\"#{cmd.shellescape}\\\"")
+        commands << maybe_command("#{cmd} ; #{EXIT_CODE}=\"$?\"")
+        commands << maybe_command(
+          make_if(EXIT_CODE, nil, [
+            "#{DO_NEXT}=\"$#{EXIT_CODE}\"",
+            debug_message("Command failed \\\"#{cmd.shellescape}\\\""),
+          ].join("\n"))
         )
-
-        if phase == "build"
-          # If the build phase exits successfully, dont exit, continue onto post_build
-          commands << make_if(EXIT_CODE, nil, "#{BUILD_EXIT_CODE}=$#{EXIT_CODE};#{EXIT_CODE}=\"0\";#{DO_NEXT}=\"0\"")
-        elsif phase == "post_build"
-          # exit BUILD_EXIT_CODE || EXIT_CODE
-          commands << make_if(BUILD_EXIT_CODE, nil, "exit $#{BUILD_EXIT_CODE}")
-          commands << make_if(EXIT_CODE, nil, "exit $#{EXIT_CODE}")
-        else
-          commands << make_if(EXIT_CODE, nil, "exit $#{EXIT_CODE}")
-        end
       end
 
-      ["bash", "-c", commands.join("\n")]
+      commands << make_if(
+        EXIT_CODE,
+        debug_message("Completed phase \\\"#{phase}\\\", successful: true"),
+        debug_message("Completed phase \\\"#{phase}\\\", successful: false"),
+      )
+
+      if phase == "build"
+        # If the build phase exits successfully, dont exit, continue onto post_build
+        commands << make_if(EXIT_CODE, nil, "#{BUILD_EXIT_CODE}=$#{EXIT_CODE};#{EXIT_CODE}=\"0\";#{DO_NEXT}=\"0\"")
+      elsif phase == "post_build"
+        # exit BUILD_EXIT_CODE || EXIT_CODE
+        commands << make_if(BUILD_EXIT_CODE, nil, "exit $#{BUILD_EXIT_CODE}")
+        commands << make_if(EXIT_CODE, nil, "exit $#{EXIT_CODE}")
+      else
+        commands << make_if(EXIT_CODE, nil, "exit $#{EXIT_CODE}")
+      end
+
+      commands
     end
 
     # Run the commands of the given buildspec on the given container.
