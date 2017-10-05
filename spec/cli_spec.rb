@@ -84,24 +84,50 @@ RSpec.describe CLI do
         expect(@opts[:quiet]).to be_truthy
       end
 
-      it "Supports no_creds" do
+      it "Supports no_credentials" do
         @runner = mock_runner
-        @cli = CLI.new ["-p", TEST_PATH, "--no_creds"]
+        @cli = CLI.new ["-p", TEST_PATH, "--no_credentials"]
         @cli.run
-        expect(@opts).to have_key(:no_creds)
-        expect(@opts[:no_creds]).to be_truthy
+        expect(@opts).to have_key(:no_credentials)
+        expect(@opts[:no_credentials]).to be_truthy
       end
 
       it "Supports profile" do
         @runner = mock_runner
-        sts_class = class_double("Aws::STS::Client").as_stubbed_const(:transfer_nested_constants => true)
-        sts_client = double("sts_client")
-        expect(sts_class).to receive(:new).with(hash_including(:profile => "bob")) { sts_client }
         @cli = CLI.new ["-p", TEST_PATH, "--profile", "bob"]
         @cli.run
 
-        expect(@opts).to have_key(:sts_client)
-        expect(@opts[:sts_client]).to eq(sts_client)
+        expect(@opts).to have_key(:profile)
+        expect(@opts[:profile]).to eq("bob")
+      end
+
+      it "Supports region" do
+        @runner = mock_runner
+        @cli = CLI.new ["-p", TEST_PATH, "--region", "us-south-8"] # the ocho
+        @cli.run
+
+        expect(@opts).to have_key(:region)
+        expect(@opts[:region]).to eq("us-south-8")
+      end
+    end
+
+    context "Invalid invocations" do
+      it "profile and no_credentials" do
+        @runner = mock_runner
+        @cli = CLI.new ["-p", TEST_PATH, "--profile", "thebuilder", "--no_credentials"]
+        expect {@cli.run} .to raise_error(OptionParser::InvalidOption)
+      end
+
+      it "aws_dockerfile_path and image_id" do
+        @runner = mock_runner
+        @cli = CLI.new ["-p", TEST_PATH, "--aws_dockerfile_path", "windows/98/fortran-0.1", "-i", "0xdeadbeef"]
+        expect {@cli.run} .to raise_error(OptionParser::InvalidOption)
+      end
+
+      it "no path" do
+        @runner = mock_runner
+        @cli = CLI.new []
+        expect {@cli.run} .to raise_error(OptionParser::MissingArgument)
       end
     end
   end
@@ -116,7 +142,8 @@ RSpec.describe CLI do
     let(:stub_ssm) { Aws::SSM::Client.new(stub_responses: true) }
     it "works as expected" do
       stub_ssm.stub_responses(:get_parameter, { :parameter => { :value => SSM_VALUE } })
-      expect(Aws::SSM::Client).to receive(:new).and_return(stub_ssm)
+      # 2 times -> once for actual getting of parameters, once for a hack to get the default region
+      expect(Aws::SSM::Client).to receive(:new).and_return(stub_ssm, stub_ssm)
 
       # ignore warning for redefining ARGV constant
       warn_level = $VERBOSE

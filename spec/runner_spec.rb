@@ -92,6 +92,7 @@ RSpec.describe Runner do
     ECHO_CREDS_DIR = File.join(FIXTURES_PATH, "echo_creds")
     FILES_DIR = File.join(FIXTURES_PATH, "files")
     SHELL_ATTRIBUTES_DIR = File.join(FIXTURES_PATH, "shell")
+    REGION_DIR = File.join(FIXTURES_PATH, "region")
 
     context "Quiet" do
       before :all do
@@ -109,6 +110,35 @@ RSpec.describe Runner do
 
       it "doesn't output debug messages" do
         expect(@errstream.string).to_not include("[CodeBuildLocal Runner]")
+      end
+    end
+
+    context "Region" do
+      before :all do
+        @region = 'ap-northeast-1'
+        @exit_code = run @default_image, FolderSourceProvider.new(REGION_DIR), :region => @region
+      end
+
+      it "exits succesfully" do
+        expect(@exit_code).to eq(0)
+      end
+
+      it "outputs specified region" do
+        expect(@outstream.string).to eq("#{@region}\n#{@region}\n")
+      end
+    end
+
+    context "Default Region"  do
+      before :all do
+        @exit_code = run @default_image, FolderSourceProvider.new(REGION_DIR)
+      end
+
+      it "exits succesfully" do
+        expect(@exit_code).to eq(0)
+      end
+
+      it "outputs specified region" do
+        expect(@outstream.string).to match(/.+\n.+\n/)
       end
     end
 
@@ -187,26 +217,30 @@ RSpec.describe Runner do
       end
     end
 
-    context "Custom STS client" do
+    context "Custom profile" do
       # test exit code and output here, since CodeBuild runs are expensive and mocks shouldn't live outside of a single test execution
       it "exits successfully and yields correct output" do
+        profile = "expected profile"
+
+        stub_sts = Aws::STS::Client.new(stub_responses: true)
+        expect(Aws::STS::Client).to receive(:new).with(hash_including(:profile => profile)).and_return(stub_sts)
+
         # expected key/secret/token
         @aws_key = "not so secret key"
         @aws_secret = "very secret, shhh!!"
         @aws_token = "token/token/token/token/token/token/token/token/token/token/token/token/..."
 
         # make mock client
-        @sts_client = double("sts_client")
         @creds = double("credentials")
         allow(@creds).to receive(:credentials) { { :access_key_id => @aws_key, :secret_access_key => @aws_secret, :session_token => @aws_token} }
-        allow(@sts_client).to receive(:get_session_token) { @creds }
+        allow(stub_sts).to receive(:get_session_token) { @creds }
 
         # make runner and execute
-        @exit_code = run @default_image, FolderSourceProvider.new(ECHO_CREDS_DIR), :sts_client => @sts_client
+        @exit_code = run @default_image, FolderSourceProvider.new(ECHO_CREDS_DIR), :profile => profile
 
         # expect
         expect(@creds).to have_received(:credentials).with(no_args)
-        expect(@sts_client).to have_received(:get_session_token).with(no_args)
+        expect(stub_sts).to have_received(:get_session_token).with(no_args)
         expect(@exit_code).to eq(0)
         expect(@outstream.string).to eq("#{@aws_key}\n#{@aws_secret}\n#{@aws_token}\n")
       end

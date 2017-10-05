@@ -71,9 +71,13 @@ By default CodeBuildLocal will use the configured default AWS profile. Specify a
     $ code_build_local -p /path/to/project/ --profile MyBuilderBot
 
 By default CodeBuildLocal will attach AWS STS credentials for the current default AWS profile to the CodeBuild project's Docker container.
-You can opt out of this by passing ```--no_creds```:
+You can opt out of this by passing ```--no_credentials```:
 
-    $ code_build_local -p /path/to/project/ --no_creds
+    $ code_build_local -p /path/to/project/ --no_credentials
+
+You may specify the AWS region provided to the CodeBuild project. This will set the [appropriate env variables](http://docs.aws.amazon.com/codebuild/latest/userguide/build-env-ref-env-vars.html) to make it look like the CodeBuild project is running in the specified region. Otherwise it uses the default region configured by the current or provided AWS profile.
+
+    $ code_build_local -p /path/to/project/ --region us-east-2
 
 ## Development
 

@@ -55,10 +55,10 @@ module CodeBuildLocal
     #   * *:errstream* (StringIO) --- for redirecting the codebuild project's stderr output
     #   * *:build_spec_path* (String) --- Path of the buildspec file (including filename )
     #     relative to the CodeBuild project root. Defaults to {DEFAULT_BUILD_SPEC_PATH}.
-    #   * *:sts_client* (Aws::STS::Client) --- STS client for providing credentials to CodeBuild image,
-    #     defaults to default client that uses the system configured AWS account.
     #   * *:quiet* (Boolean) --- suppress debug output
+    #   * *:profile* (String) --- Profile to use for AWS clients
     #   * *:no_credentials* (Boolean) --- don't supply AWS credentials to the container
+    #   * *:region* (String) --- AWS region to provide to the container.
     #
     # @return [Integer] The exit code from running the CodeBuild project.
     def self.run image, source_provider, opts = {}
@@ -101,59 +101,71 @@ module CodeBuildLocal
     #   * *:build_spec_path* (String) --- Path of the buildspec file (including filename )
     #     relative to the CodeBuild project root. Defaults to {DEFAULT_BUILD_SPEC_PATH}.
     #   * *:quiet* (Boolean) --- suppress debug output
-    #   * *:sts_client* (Aws::STS::Client) --- STS client for providing credentials to CodeBuild image,
-    #     defaults to default client that uses the system configured AWS account.
+    #   * *:profile* (String) --- profile to use for AWS clients
     #   * *:no_credentials* (Boolean) --- don't supply AWS credentials to the container
+    #   * *:region* (String) --- name of the AWS region to provide to the container
 
     def initialize image, source_provider, opts = {}
       @image = image
       @source_provider = source_provider
-      @outstream  = opts[:outstream]
-      @errstream  = opts[:errstream]
+      @outstream       = opts[:outstream]
+      @errstream       = opts[:errstream]
       @build_spec_path = opts[:build_spec_path] || DEFAULT_BUILD_SPEC_PATH
-      @quiet      = opts[:quiet] || false
-      @no_creds   = opts[:no_credentials]
-      @sts_client = if @no_creds
-                      nil
-                    elsif opts[:sts_client]
-                      opts[:sts_client]
-                    else
-                      Aws::STS::Client.new
-                    end
+      @quiet           = opts[:quiet] || false
+      @no_credentials  = opts[:no_credentials]
+      @profile         = opts[:profile]
+      @region          = opts[:region]
+
+      raise ArgumentError, "Cannot specify both :no_credentials and :profile" if @profile && @no_credentials
     end
 
     DEFAULT_TIMEOUT_SECONDS = 2000
     REMOTE_SOURCE_VOLUME_PATH_RO="/usr/app_ro/"
     REMOTE_SOURCE_VOLUME_PATH="/usr/app/"
 
+    # Add region configuration environment variables to the env.
+    # Mutates the env passed to it
+    #
+    # @param env [Array<String>] An array of env variables in the format KEY=FOO, KEY2=BAR, ...
+
+    def add_region_variables env
+      region = @region
+      # This is an awful hack but I can't find the Ruby SDK way of getting the default region....
+      region ||= Aws::SSM::Client.new(profile: @profile).config.region
+      env << "AWS_DEFAULT_REGION=#{region}"
+      env << "AWS_REGION=#{region}"
+    end
+
     # Make an array that contains environment variables according to the provided
     # build_spec and sts client configuration.
     #
     # @param build_spec [CodeBuildLocal::BuildSpec::BuildSpec]
     #
-    # @return [Array<String>] An array of env variables in the format KEY=FOO, KEY2=BAR
+    # @return [Array<String>] An array of env variables in the format KEY=FOO, KEY2=BAR, ...
 
-    def make_env(build_spec)
+    def make_env build_spec
       env = []
 
       build_spec.env.keys.each { |k| env << "#{k}=#{build_spec.env[k]}" }
 
-      unless @sts_client.nil?
-        session_token = @sts_client.get_session_token
+      unless @no_credentials
+        sts_client = Aws::STS::Client.new profile: @profile
+        session_token = sts_client.get_session_token
         credentials = session_token.credentials
 
         env << "AWS_ACCESS_KEY_ID=#{credentials[:access_key_id]}"
         env << "AWS_SECRET_ACCESS_KEY=#{credentials[:secret_access_key]}"
         env << "AWS_SESSION_TOKEN=#{credentials[:session_token]}"
 
-        ssm = Aws::SSM::Client.new(credentials: session_token)
+        ssm = Aws::SSM::Client.new credentials: session_token
         build_spec.parameter_store.keys.each do |k|
           name = build_spec.parameter_store[k]
           param_value = ssm.get_parameter(:name => name, :with_decryption => true).parameter.value
           env << "#{k}=#{param_value}"
         end
-
       end
+
+      add_region_variables env
 
       env
     end

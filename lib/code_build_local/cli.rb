@@ -11,7 +11,7 @@ module CodeBuildLocal
     def run
       source_provider = get_source_provider
       image           = get_image
-      @options[:sts_client], @options[:no_creds] = get_client_or_no_creds
+      raise OptionParser::InvalidOption, "Cannot specify both :profile and :no_credentials" if @options[:profile] && @options[:no_credentials]
 
       CodeBuildLocal::Runner.run image, source_provider, @options
     end
@@ -35,13 +35,15 @@ module CodeBuildLocal
     # * \-q \-\-quiet --- Silence debug messages.
     # * \-\-build_spec_path BUILD_SPEC_PATH --- Alternative path for buildspec file, defaults to {Runner::DEFAULT_BUILD_SPEC_PATH}.
     # * \-\-profile --- AWS profile of the credentials to provide the container, defaults to the default profile.
-    #   This cannot be specified at the same time as \-\-no_creds.
-    # * \-\-no_creds --- Don't add AWS credentials to the CodeBuild project's container.
+    #   This cannot be specified at the same time as \-\-no_credentials.
+    # * \-\-no_credentials --- Don't add AWS credentials to the CodeBuild project's container.
     #   This cannot be specified at the same time as \-\-profile.
     # * \-\-image_id IMAGE_ID --- Id of alternative docker image to use. This cannot be specified at the same time as \-\-aws_dockerfile_path
     # * \-\-aws_dockerfile_path AWS_DOCKERFILE_PATH --- Alternative AWS CodeBuild Dockerfile path, defaults to {DefaultImages::DEFAULT_DOCKERFILE_PATH}.
     #   This cannot be specified at the same time as \-\-image_id.
     #   See the {https://github.com/aws/aws-codebuild-docker-images AWS CodeBuild Docker Images repo} for the dockerfiles available through this option.
+    # * \-\-region REGION_NAME --- Name of the AWS region to provide to the container. Will set environment variables to make the container appear like
+    #   it is in the specified AWS region. Otherwise it defaults to the default AWS region configured in the profile.
     #
     # @param options [Hash] the option hash to populate
     # @return [OptionParser] the option parser that parses the described options.
@@ -55,7 +57,8 @@ module CodeBuildLocal
         self.add_opt_image_id            opts, options
         self.add_opt_aws_dockerfile_path opts, options
         self.add_opt_profile             opts, options
-        self.add_opt_no_creds            opts, options
+        self.add_opt_no_credentials      opts, options
+        self.add_opt_region              opts, options
       end
     end
 
@@ -124,16 +127,26 @@ Arguments:
     def self.add_opt_profile opts, options
       opts.on('--profile PROFILE',
               'AWS profile of the credentials to provide the container, defaults to the default profile. '\
-              'This cannot be set at the same time as --no_creds.') do |profile|
+              'This cannot be set at the same time as --no_credentials.') do |profile|
         options[:profile] = profile
       end
     end
 
-    def self.add_opt_no_creds opts, options
-      opts.on('--no_creds',
+    def self.add_opt_no_credentials opts, options
+      opts.on('--no_credentials',
               'Don\'t add AWS credentials to the CodeBuild project\'s container. '\
               'This cannot be set at the same time as --profile.') do
-        options[:no_creds] = true
+        options[:no_credentials] = true
+      end
+    end
+
+    def self.add_opt_region opts, options
+      opts.on('--region REGION_NAME',
+              'Name of the AWS region to provide to the container. '\
+              'CodeBuildLocal will set environment variables to make the container appear like '\
+              'it is in the specified AWS region. Otherwise it defaults to the default AWS '\
+              'region configured in the profile.') do |region|
+        options[:region] = region
       end
     end
 
@@ -152,37 +165,17 @@ Arguments:
     # Up to one can be specified.
 
     def get_image
-      image_id, aws_dockerfile_path = CLI::only_one @options, :image_id, :aws_dockerfile_path
-      if image_id
+      image_id = @options.delete :image_id
+      aws_dockerfile_path = @options.delete :aws_dockerfile_path
+      if image_id && aws_dockerfile_path
+        raise OptionParser::InvalidOption, "Cannot specify both :image_id and :aws_dockerfile_path"
+      elsif image_id
         Docker::Image.get(image_id)
       elsif aws_dockerfile_path
         CodeBuildLocal::DefaultImages.build_code_build_image :aws_dockerfile_path => aws_dockerfile_path
       else
         CodeBuildLocal::DefaultImages.build_code_build_image
       end
-    end
-
-    # Choose whether to create an sts_client or specify no credentials based on the profile and no_creds options.
-    # Up to one can be specified.
-
-    def get_client_or_no_creds
-      profile, no_creds = CLI::only_one @options, :profile, :no_creds
-      sts_client = Aws::STS::Client.new profile: profile if profile
-      return sts_client, no_creds
-    end
-
-    # Remove and return one of the two keys from the document, if either exists.
-    # If both exist, raise an error.
-    #
-    # @raise [OptionParser::InvalidOption] if both keys exist
-    # @return a pair (value1, value2) where up to one of entry has the value of the corresponding key in the document
-
-    def self.only_one document, key1, key2
-      value1, value2 = document.delete(key1), document.delete(key2)
-      if value1 and value2
-        raise OptionParser::InvalidOption, "Cannot specify both #{key1} and #{key2}"
-      end
-      return value1, value2
     end
   end
 end
