@@ -4,18 +4,18 @@ require 'docker'
 require 'pathname'
 require 'shellwords'
 
-module CodeBuildLocal
+module BuildSpecRunner
 
-  # Module for running CodeBuild projects on a local docker container.
+  # Module for running projects on a local docker container.
   #
-  # It is expected that you have a {CodeBuildLocal::SourceProvider} object that can yield a
+  # It is expected that you have a {BuildSpecRunner::SourceProvider} object that can yield a
   # path containing a project suitable for AWS Codebuild. The project should have a buildspec
   # file in its root directory. This module lets you use the default Ruby CodeBuild image or
   # specify your own. See {Runner#run} and {Runner#run_default}.
   #
-  # @see Runner#run_default run_default - an easy to use method for running CodeBuild projects on the
+  # @see Runner#run_default run_default - an easy to use method for running projects on the
   #   default Ruby 2.3.1 image
-  # @see Runner#run run - a more configurable way of running CodeBuild projects locally
+  # @see Runner#run run - a more configurable way of running projects locally
 
   class Runner
 
@@ -23,51 +23,51 @@ module CodeBuildLocal
 
     DEFAULT_BUILD_SPEC_PATH = 'buildspec.yml'
 
-    # Run the CodeBuild project at the specified directory on the default AWS CodeBuild Ruby 2.3.1 image.
+    # Run the project at the specified directory on the default AWS CodeBuild Ruby 2.3.1 image.
     #
-    # @param path [String] The path to the CodeBuild project.
-    # @return [Integer] The exit code from running the CodeBuild project.
+    # @param path [String] The path to the project.
+    # @return [Integer] The exit code from running the project.
     #
     # @see run
-    # @see CodeBuildLocal::DefaultImages.build_aws_codebuild_image
+    # @see BuildSpecRunner::DefaultImages.build_image
 
     def self.run_default path, opts={}
       Runner.run(
-        CodeBuildLocal::DefaultImages.build_code_build_image,
-        CodeBuildLocal::SourceProvider::FolderSourceProvider.new(path),
+        BuildSpecRunner::DefaultImages.build_image,
+        BuildSpecRunner::SourceProvider::FolderSourceProvider.new(path),
         opts
       )
     end
 
-    # Run a CodeBuild project on the specified image.
+    # Run a project on the specified image.
     #
-    # Run a CodeBuild project on the specified image, with the source pointed to by
+    # Run a project on the specified image, with the source pointed to by
     # the specified source provider. If the buildspec filename is not buildspec.yml or
     # is not located in the project root, specify the option :build_spec_path to choose a different
     # relative path (including filename).
     #
-    # @param image [Docker::Image] A docker image to run the CodeBuild project on.
-    # @param source_provider [CodeBuildLocal::SourceProvider] A source provider that yields
-    #   the source for the CodeBuild project.
+    # @param image [Docker::Image] A docker image to run the project on.
+    # @param source_provider [BuildSpecRunner::SourceProvider] A source provider that yields
+    #   the source for the project.
     # @param opts [Hash] A hash containing several optional values:
     #   for redirecting output.
-    #   * *:outstream* (StringIO) --- for redirecting the codebuild project's stdout output
-    #   * *:errstream* (StringIO) --- for redirecting the codebuild project's stderr output
+    #   * *:outstream* (StringIO) --- for redirecting the project's stdout output
+    #   * *:errstream* (StringIO) --- for redirecting the project's stderr output
     #   * *:build_spec_path* (String) --- Path of the buildspec file (including filename )
-    #     relative to the CodeBuild project root. Defaults to {DEFAULT_BUILD_SPEC_PATH}.
+    #     relative to the project root. Defaults to {DEFAULT_BUILD_SPEC_PATH}.
     #   * *:quiet* (Boolean) --- suppress debug output
     #   * *:profile* (String) --- Profile to use for AWS clients
     #   * *:no_credentials* (Boolean) --- don't supply AWS credentials to the container
     #   * *:region* (String) --- AWS region to provide to the container.
     #
-    # @return [Integer] The exit code from running the CodeBuild project.
+    # @return [Integer] The exit code from running the project.
     def self.run image, source_provider, opts = {}
       runner = Runner.new image, source_provider, opts
       Runner.configure_docker
       runner.execute
     end
 
-    # Run the code build project
+    # Run the project
     #
     # Parse the build_spec, create the environment from the build_spec and any configured credentials,
     # and build a container. Then execute the build spec's commands on the container.
@@ -96,10 +96,10 @@ module CodeBuildLocal
     #
     # @param opts [Hash] A hash containing several optional values,
     #   for redirecting output.
-    #   * *:outstream* (StringIO) --- for redirecting the codebuild project's stdout output
-    #   * *:errstream* (StringIO) --- for redirecting the codebuild project's stderr output
+    #   * *:outstream* (StringIO) --- for redirecting the project's stdout output
+    #   * *:errstream* (StringIO) --- for redirecting the project's stderr output
     #   * *:build_spec_path* (String) --- Path of the buildspec file (including filename )
-    #     relative to the CodeBuild project root. Defaults to {DEFAULT_BUILD_SPEC_PATH}.
+    #     relative to the project root. Defaults to {DEFAULT_BUILD_SPEC_PATH}.
     #   * *:quiet* (Boolean) --- suppress debug output
     #   * *:profile* (String) --- profile to use for AWS clients
     #   * *:no_credentials* (Boolean) --- don't supply AWS credentials to the container
@@ -139,7 +139,7 @@ module CodeBuildLocal
     # Make an array that contains environment variables according to the provided
     # build_spec and sts client configuration.
     #
-    # @param build_spec [CodeBuildLocal::BuildSpec::BuildSpec]
+    # @param build_spec [BuildSpecRunner::BuildSpec::BuildSpec]
     #
     # @return [Array<String>] An array of env variables in the format KEY=FOO, KEY2=BAR, ...
 
@@ -186,35 +186,35 @@ module CodeBuildLocal
     # The buildspec file should be located at the root of the source directory
     # and named "buildspec.yml". An alternate path / filename can be specified by providing build_spec_name.
     #
-    # @param source_provider [CodeBuildLocal::SourceProvider] A source provider that yields the path for
-    #   the desired CodeBuild project.
+    # @param source_provider [BuildSpecRunner::SourceProvider] A source provider that yields the path for
+    #   the desired project.
     # @param build_spec_path [String] The path and file name for the buildspec file in the project directory.
     #   examples: "buildspec.yml", "./foo/build_spec.yml", "bar/bs.yml", "../../weird/but/ok.yml", "/absolute/paths/too.yml"
     #
-    # @return [CodeBuildLocal::BuildSpec::BuildSpec] A BuildSpec object representing the information contained
+    # @return [BuildSpecRunner::BuildSpec::BuildSpec] A BuildSpec object representing the information contained
     #   by the specified buildspec.
     #
-    # @see CodeBuildLocal::BuildSpec::BuildSpec
+    # @see BuildSpecRunner::BuildSpec::BuildSpec
 
     def self.make_build_spec(source_provider, build_spec_path="buildspec.yml")
       if Pathname.new(build_spec_path).absolute?
-        CodeBuildLocal::BuildSpec::BuildSpec.new(build_spec_path)
+        BuildSpecRunner::BuildSpec::BuildSpec.new(build_spec_path)
       else
-        CodeBuildLocal::BuildSpec::BuildSpec.new(File.join(source_provider.path, build_spec_path))
+        BuildSpecRunner::BuildSpec::BuildSpec.new(File.join(source_provider.path, build_spec_path))
       end
     end
 
-    # Make a docker container from the specified image for running the CodeBuild project.
+    # Make a docker container from the specified image for running the project.
     #
     # The container:
     # * is created from the specified image.
     # * is setup with the specified environment variables.
     # * has a default command of "/bin/bash" with a tty configured, so that the image stays running when started.
-    # * has the CodeBuild project source provided by the source_provider mounted to a readonly directory
+    # * has the project source provided by the source_provider mounted to a readonly directory
     #   at {REMOTE_SOURCE_VOLUME_PATH_RO}.
     #
-    # @param image [Docker::Image] The docker image to be used to create the CodeBuild project.
-    # @param source_provider [CodeBuildLocal::SourceProvider] A source provider to provide the location
+    # @param image [Docker::Image] The docker image to be used to create the project.
+    # @param source_provider [BuildSpecRunner::SourceProvider] A source provider to provide the location
     #   of the project that will be mounted readonly to the image at the directory {REMOTE_SOURCE_VOLUME_PATH_RO}.
     # @param env [Hash] the environment to pass along to the container. Should be an array with elements of the
     #   format KEY=VAL, FOO=BAR, etc. See the output of {#make_env}.
@@ -239,7 +239,7 @@ module CodeBuildLocal
     # Bookkeeping bash variable for tracking most phases' exit codes
     EXIT_CODE = "_cbl_exit_code_"
     # Prepend this to container debug messages
-    DEBUG_HEADER = "[CodeBuildLocal Runner]"
+    DEBUG_HEADER = "[BuildSpecRunner Runner]"
 
     # Make a conditional shell command
     #
@@ -269,9 +269,9 @@ module CodeBuildLocal
       end
     end
 
-    # Make a shell script to imitate the behavior of the CodeBuild agent.
+    # Make a shell script act as the build spec runner agent.
     #
-    # This duplicates the running semantics of CodeBuild, including phase order, shell session, behavior, etc.
+    # This implements the running semantics build specs, including phase order, shell session, behavior, etc.
     # Yes, this is very hacky. I'd love to find a better way that:
     # * doesn't introduce dependencies on the host system
     # * allows the build spec commands to run as if they were run consecutively in a single shell session
@@ -279,20 +279,20 @@ module CodeBuildLocal
     # * Remote control of agent on container
     # * Separate streams for output, errors, and debug messages
     #
-    # @param build_spec [CodeBuildLocal::BuildSpec::BuildSpec] A build spec object containing the commands to run
-    # @return [Array<String>] An array to execute an agent script that runs the CodeBuild project
+    # @param build_spec [BuildSpecRunner::BuildSpec::BuildSpec] A build spec object containing the commands to run
+    # @return [Array<String>] An array to execute an agent script that runs the project
     
     def make_agent_script build_spec
       commands = agent_setup_commands
 
-      CodeBuildLocal::BuildSpec::PHASES.each do |phase|
+      BuildSpecRunner::BuildSpec::PHASES.each do |phase|
         commands.push(*agent_phase_commands(build_spec, phase))
       end
 
       ["bash", "-c", commands.join("\n")]
     end
 
-    # Create the setup commands for the CodeBuild shell agent script
+    # Create the setup commands for the shell agent script
     # The setup commands:
     # * Copy project to a writable dir
     # * Move to the dir
@@ -310,9 +310,9 @@ module CodeBuildLocal
       ]
     end
 
-    # Create CodeBuild shell agent commands for the given phase
+    # Create shell agent commands for the given phase
     #
-    # @param build_spec [CodeBuildLocal::BuildSpec::BuildSpec] the build spec object from which to read the commands
+    # @param build_spec [BuildSpecRunner::BuildSpec::BuildSpec] the build spec object from which to read the commands
     # @param phase [String] the phase to run
     # @return [Array<String>] a list of commands to run for the given phase
 
@@ -354,7 +354,7 @@ module CodeBuildLocal
 
     # Run the commands of the given buildspec on the given container.
     #
-    # Runs the phases in the order specified by the CodeBuild documentation.
+    # Runs the phases in the order specified by the documentation.
     #
     # @see http://docs.aws.amazon.com/codebuild/latest/userguide/view-build-details.html#view-build-details-phases
 

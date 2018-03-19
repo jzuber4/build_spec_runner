@@ -1,7 +1,7 @@
 require 'kwalify'
 require 'yaml'
 
-module CodeBuildLocal
+module BuildSpecRunner
   module BuildSpec
 
     # Phases of a buildspec file.

@@ -9,7 +9,7 @@ desc "Open a terminal with this gem required"
 task :irb do
   require 'irb'
   require 'irb/completion'
-  require 'code_build_local'
+  require 'build_spec_runner'
   ARGV.clear
   IRB.start
 end

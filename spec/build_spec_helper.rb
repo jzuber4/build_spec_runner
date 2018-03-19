@@ -1,7 +1,7 @@
-require 'code_build_local'
+require 'build_spec_runner'
 require 'tempfile'
 
-BuildSpec = CodeBuildLocal::BuildSpec::BuildSpec
+BuildSpec = BuildSpecRunner::BuildSpec::BuildSpec
 
 module BuildSpecHelper
 

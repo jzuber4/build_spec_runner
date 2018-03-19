@@ -11,6 +11,7 @@ phases:
       - echo "LOCAL VALUE = $LOCAL_VAR"
   build:
     commands:
+      - mkdir folder_within_project
       - cd folder_within_project
   post_build:
     commands:

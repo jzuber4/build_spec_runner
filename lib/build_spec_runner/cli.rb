@@ -1,7 +1,7 @@
 require 'docker'
 require 'optparse'
 
-module CodeBuildLocal
+module BuildSpecRunner
   class CLI
 
     # Run the CLI object, according to the parsed options.
@@ -13,13 +13,13 @@ module CodeBuildLocal
       image           = get_image
       raise OptionParser::InvalidOption, "Cannot specify both :profile and :no_credentials" if @options[:profile] && @options[:no_credentials]
 
-      CodeBuildLocal::Runner.run image, source_provider, @options
+      BuildSpecRunner::Runner.run image, source_provider, @options
     end
 
     # Create a CLI object, parsing the specified argv, or ARGV if none specified.
     # 
     # @param argv [Array] array of arguments, defaults to ARGV
-    # @return [CLI] a CLI object for running the CodeBuild project in a manner determined by argv. 
+    # @return [CLI] a CLI object for running the project in a manner determined by argv. 
     # @see CLI.optparse
 
     def initialize argv = ARGV
@@ -31,12 +31,12 @@ module CodeBuildLocal
     #
     # The options are as follows:
     # * \-h \-\-help --- Output help message
-    # * \-p \-\-path PATH --- Required argument, path the to the CodeBuild project to run
+    # * \-p \-\-path PATH --- Required argument, path the to the project to run
     # * \-q \-\-quiet --- Silence debug messages.
     # * \-\-build_spec_path BUILD_SPEC_PATH --- Alternative path for buildspec file, defaults to {Runner::DEFAULT_BUILD_SPEC_PATH}.
     # * \-\-profile --- AWS profile of the credentials to provide the container, defaults to the default profile.
     #   This cannot be specified at the same time as \-\-no_credentials.
-    # * \-\-no_credentials --- Don't add AWS credentials to the CodeBuild project's container.
+    # * \-\-no_credentials --- Don't add AWS credentials to the project's container.
     #   This cannot be specified at the same time as \-\-profile.
     # * \-\-image_id IMAGE_ID --- Id of alternative docker image to use. This cannot be specified at the same time as \-\-aws_dockerfile_path
     # * \-\-aws_dockerfile_path AWS_DOCKERFILE_PATH --- Alternative AWS CodeBuild Dockerfile path, defaults to {DefaultImages::DEFAULT_DOCKERFILE_PATH}.
@@ -67,7 +67,7 @@ module CodeBuildLocal
     def self.banner
       %|Usage: #{File.basename(__FILE__)} arguments
 
-Run a CodeBuild project locally.
+Run a build spec locally.
 
 Arguments:
       |
@@ -89,7 +89,7 @@ Arguments:
 
     def self.add_opt_path opts, options
       opts.on('-p', '--path PATH',
-              '[REQUIRED] Path to the CodeBuild project to run.') do |project_path|
+              '[REQUIRED] Path to the project to run.') do |project_path|
         options[:path] = project_path
       end
     end
@@ -134,7 +134,7 @@ Arguments:
 
     def self.add_opt_no_credentials opts, options
       opts.on('--no_credentials',
-              'Don\'t add AWS credentials to the CodeBuild project\'s container. '\
+              'Don\'t add AWS credentials to the project\'s container. '\
               'This cannot be set at the same time as --profile.') do
         options[:no_credentials] = true
       end
@@ -143,7 +143,7 @@ Arguments:
     def self.add_opt_region opts, options
       opts.on('--region REGION_NAME',
               'Name of the AWS region to provide to the container. '\
-              'CodeBuildLocal will set environment variables to make the container appear like '\
+              'BuildSpecRunner will set environment variables to make the container appear like '\
               'it is in the specified AWS region. Otherwise it defaults to the default AWS '\
               'region configured in the profile.') do |region|
         options[:region] = region
@@ -158,7 +158,7 @@ Arguments:
     def get_source_provider
       path = @options.delete :path
       raise OptionParser::MissingArgument, 'Must specify a path (-p, --path PATH)' if path.nil?
-      CodeBuildLocal::SourceProvider::FolderSourceProvider.new path
+      BuildSpecRunner::SourceProvider::FolderSourceProvider.new path
     end
 
     # Choose the image based on the aws_dockerfile_path and image_id options.
@@ -172,9 +172,9 @@ Arguments:
       elsif image_id
         Docker::Image.get(image_id)
       elsif aws_dockerfile_path
-        CodeBuildLocal::DefaultImages.build_code_build_image :aws_dockerfile_path => aws_dockerfile_path
+        BuildSpecRunner::DefaultImages.build_image :aws_dockerfile_path => aws_dockerfile_path
       else
-        CodeBuildLocal::DefaultImages.build_code_build_image
+        BuildSpecRunner::DefaultImages.build_image
       end
     end
   end

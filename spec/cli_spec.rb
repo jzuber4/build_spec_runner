@@ -2,8 +2,8 @@ require 'aws-sdk-core'
 require 'spec_helper'
 require 'docker'
 
-CLI = CodeBuildLocal::CLI
-DefaultImages = CodeBuildLocal::DefaultImages
+CLI = BuildSpecRunner::CLI
+DefaultImages = BuildSpecRunner::DefaultImages
 
 RSpec.describe CLI do
 
@@ -12,11 +12,11 @@ RSpec.describe CLI do
   TEST_PATH = FIXTURES_PATH
   TEST_BUILD_SPEC_PATH = './foo/bar/spec.yml'
   TEST_IMAGE = 'some_id'
-  TEST_AWS_DOCKERFILE_PATH = 'ubuntu/java/openjdk-8'
+  TEST_AWS_DOCKERFILE_PATH = 'ubuntu/ruby/2.2.5'
   SSM_VALUE = 'expected this value'
 
   def mock_runner
-    runner = class_double("CodeBuildLocal::Runner").as_stubbed_const(:transfer_nested_constants => true)
+    runner = class_double("BuildSpecRunner::Runner").as_stubbed_const(:transfer_nested_constants => true)
     allow(runner).to receive(:run) {|im, sp, opts| @im = im ; @sp = sp ; @opts = opts}
     runner
   end
@@ -30,7 +30,7 @@ RSpec.describe CLI do
       end
 
       it "Uses default image" do
-        expect(@im.id).to eq(DefaultImages.build_code_build_image.id)
+        expect(@im.id).to eq(DefaultImages.build_image.id)
       end
 
       it "Uses specified path" do
@@ -64,7 +64,7 @@ RSpec.describe CLI do
 
       it "Supports alternate AWS Dockerfile" do
         @runner = mock_runner
-        image = DefaultImages.build_code_build_image :aws_dockerfile_path => TEST_AWS_DOCKERFILE_PATH
+        image = DefaultImages.build_image :aws_dockerfile_path => TEST_AWS_DOCKERFILE_PATH
         @cli = CLI.new ["-p", TEST_PATH, "--aws_dockerfile_path", TEST_AWS_DOCKERFILE_PATH]
         @cli.run
         expect(@im.id).to eq(image.id)

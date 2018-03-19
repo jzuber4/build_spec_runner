@@ -1,9 +1,9 @@
-module CodeBuildLocal
+module BuildSpecRunner
 
-  # Module for defining objects that provide CodeBuild project sources.
+  # Module for defining objects that provide project sources.
   #
   # @todo Make a GitSourceProvider implmentation, for referencing
-  #   CodeBuild projects by Git repo.
+  #   projects by Git repo.
   #
   # See {SourceProvider::FolderSourceProvider} for the only implementation so far.
 

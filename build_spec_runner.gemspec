@@ -1,19 +1,19 @@
 # coding: utf-8
 lib = File.expand_path("../lib", __FILE__)
 $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
-require "code_build_local/version"
+require "build_spec_runner/version"
 
 Gem::Specification.new do |spec|
-  spec.name          = "code_build_local"
-  spec.version       = CodeBuildLocal::VERSION
+  spec.name          = "build_spec_runner"
+  spec.version       = BuildSpecRunner::VERSION
   spec.authors       = ["Jimmy Zuber"]
   spec.email         = ["jzuber4@gmail.com"]
 
-  spec.summary       = %q{A gem to run AWS CodeBuild projects locally.}
-  spec.description   = %q{A gem to run AWS CodeBuild projects locally.
+  spec.summary       = %q{A gem to execute AWS CodeBuild build_spec.yml files locally.}
+  spec.description   = %q{A gem to execute AWS CodeBuild build_spec.yml files locally.
 AWS CodeBuild (https://aws.amazon.com/codebuild/) is an AWS product. This gem is a third-party creation not affiliated with AWS.
 }
-  spec.homepage      = "https://github.com/jzuber4/code_build_local"
+  spec.homepage      = "https://github.com/jzuber4/build_spec_runner"
   spec.license       = "MIT"
 
   spec.files = `git ls-files -z`.split("\x0").reject do |f|

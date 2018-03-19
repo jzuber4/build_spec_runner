@@ -1,14 +1,14 @@
 require 'git'
 require 'docker'
 
-module CodeBuildLocal
+module BuildSpecRunner
 
-  # Module for building the default AWS CodeBuild images. See {DefaultImages.build_code_build_image}
+  # Module for building the default AWS CodeBuild images. See {DefaultImages.build_image}
 
   module DefaultImages
 
     # The default directory used to clone the AWS CodeBuild Images repo
-    REPO_PATH = '/tmp/code_build_local/'
+    REPO_PATH = '/tmp/build_spec_runner/'
     # The default CodeBuild Dockerfile
     DEFAULT_DOCKERFILE_PATH = 'ubuntu/ruby/2.3.1/'
 
@@ -29,14 +29,14 @@ module CodeBuildLocal
     #
     # @see https://github.com/aws/aws-codebuild-docker-images AWS CodeBuild Images Repo
 
-    def self.build_code_build_image opts={}
+    def self.build_image opts={}
 
       dockerfile_path = opts[:aws_dockerfile_path]
       dockerfile_path ||= DEFAULT_DOCKERFILE_PATH
       repo_path = opts[:repo_path]
       repo_path ||= REPO_PATH
 
-      repo = self.load_code_build_image_repo repo_path
+      repo = self.load_image_repo repo_path
       docker_dir = File.join(repo.dir.path, dockerfile_path)
       Docker::Image.build_from_dir(docker_dir)
     end
@@ -54,7 +54,7 @@ module CodeBuildLocal
     #
     # @return [Git::Base] A git repo
     #
-    def self.load_code_build_image_repo repo_path
+    def self.load_image_repo repo_path
       begin
         # pull if it already exists
         r = Git.open(File.join(repo_path, REPO_NAME))

@@ -1,9 +1,9 @@
 require 'spec_helper'
 require 'pathname'
 
-Runner = CodeBuildLocal::Runner
-DefaultImages = CodeBuildLocal::DefaultImages
-FolderSourceProvider = CodeBuildLocal::SourceProvider::FolderSourceProvider
+Runner = BuildSpecRunner::Runner
+DefaultImages = BuildSpecRunner::DefaultImages
+FolderSourceProvider = BuildSpecRunner::SourceProvider::FolderSourceProvider
 
 RSpec.describe Runner do
 
@@ -29,7 +29,7 @@ RSpec.describe Runner do
   end
 
   before :all do
-    @default_image = DefaultImages.build_code_build_image
+    @default_image = DefaultImages.build_image
 
     Aws.config[:ssm] = {
       :stub_responses => {
@@ -65,28 +65,28 @@ RSpec.describe Runner do
       it "outputs to stderr" do
         filtered_lines = @errstream.string
             .split("\n")
-            .reject{|line| line =~ /^\[CodeBuildLocal Runner\]/}
+            .reject{|line| line =~ /^\[BuildSpecRunner Runner\]/}
             .join("\n")
         expect(filtered_lines).to eq("err1\nerr2\nerr3\nerr4")
       end
 
       it "outputs debug phase messages" do
-        expect(@errstream.string).to include('[CodeBuildLocal Runner] Running phase "build"')
-        expect(@errstream.string).to include('[CodeBuildLocal Runner] Running phase "post_build"')
+        expect(@errstream.string).to include('[BuildSpecRunner Runner] Running phase "build"')
+        expect(@errstream.string).to include('[BuildSpecRunner Runner] Running phase "post_build"')
       end
 
       it "outputs debug command messages" do
-        expect(@errstream.string).to include('[CodeBuildLocal Runner] Running command "echo $VAR1"')
-        expect(@errstream.string).to include('[CodeBuildLocal Runner] Running command "echo $VAR2"')
-        expect(@errstream.string).to include('[CodeBuildLocal Runner] Running command "echo $VAR3"')
-        expect(@errstream.string).to include('[CodeBuildLocal Runner] Running command "echo $VAR4"')
+        expect(@errstream.string).to include('[BuildSpecRunner Runner] Running command "echo $VAR1"')
+        expect(@errstream.string).to include('[BuildSpecRunner Runner] Running command "echo $VAR2"')
+        expect(@errstream.string).to include('[BuildSpecRunner Runner] Running command "echo $VAR3"')
+        expect(@errstream.string).to include('[BuildSpecRunner Runner] Running command "echo $VAR4"')
       end
     end
   end
 
   describe "#run" do
 
-    JAVA_IMAGE_DIR = File.join(FIXTURES_PATH, "java_image")
+    ALTERNATE_IMAGE_DIR = File.join(FIXTURES_PATH, "alternate_image")
     PARAMETER_STORE_DIR = File.join(FIXTURES_PATH, "parameter_store")
     CUSTOM_BUILDSPEC_NAME_DIR = File.join(FIXTURES_PATH, "custom_name")
     ECHO_CREDS_DIR = File.join(FIXTURES_PATH, "echo_creds")
@@ -99,7 +99,7 @@ RSpec.describe Runner do
         @exit_code = run @default_image, FolderSourceProvider.new(DEFAULT_DIR), :quiet => true
       end
 
-      it "exits succesfully" do
+      it "exits successfully" do
         expect(@exit_code).to eq(0)
       end
 
@@ -109,7 +109,7 @@ RSpec.describe Runner do
       end
 
       it "doesn't output debug messages" do
-        expect(@errstream.string).to_not include("[CodeBuildLocal Runner]")
+        expect(@errstream.string).to_not include("[BuildSpecRunner Runner]")
       end
     end
 
@@ -119,7 +119,7 @@ RSpec.describe Runner do
         @exit_code = run @default_image, FolderSourceProvider.new(REGION_DIR), :region => @region
       end
 
-      it "exits succesfully" do
+      it "exits successfully" do
         expect(@exit_code).to eq(0)
       end
 
@@ -133,7 +133,7 @@ RSpec.describe Runner do
         @exit_code = run @default_image, FolderSourceProvider.new(REGION_DIR)
       end
 
-      it "exits succesfully" do
+      it "exits successfully" do
         expect(@exit_code).to eq(0)
       end
 
@@ -148,7 +148,7 @@ RSpec.describe Runner do
         @exit_code = run @default_image, FolderSourceProvider.new(relative_dir)
       end
 
-      it "exits succesfully" do
+      it "exits successfully" do
         expect(@exit_code).to eq(0)
       end
 
@@ -159,8 +159,8 @@ RSpec.describe Runner do
 
     context "Custom image" do
       before :all do
-        image = DefaultImages.build_code_build_image({:aws_dockerfile_path => 'ubuntu/java/openjdk-8'})
-        @exit_code = run image, FolderSourceProvider.new(JAVA_IMAGE_DIR)
+        image = DefaultImages.build_image({:aws_dockerfile_path => 'ubuntu/ruby/2.2.5'})
+        @exit_code = run image, FolderSourceProvider.new(ALTERNATE_IMAGE_DIR)
       end
 
       it "exits successfully" do
@@ -168,9 +168,7 @@ RSpec.describe Runner do
       end
 
       it "yields correct output" do
-        expect(@errstream.string).to include('openjdk version "1.8')
-        expect(@errstream.string).to include('OpenJDK Runtime Environment')
-        expect(@errstream.string).to include('OpenJDK 64-Bit Server VM')
+        expect(@outstream.string).to include('ruby 2.2.5')
       end
     end
 
@@ -218,7 +216,7 @@ RSpec.describe Runner do
     end
 
     context "Custom profile" do
-      # test exit code and output here, since CodeBuild runs are expensive and mocks shouldn't live outside of a single test execution
+      # test exit code and output here, since runs are expensive and mocks shouldn't live outside of a single test execution
       it "exits successfully and yields correct output" do
         profile = "expected profile"
 
@@ -333,12 +331,12 @@ RSpec.describe Runner do
         end
 
         it "only runs install" do
-          expect(@errstream.string).to include('[CodeBuildLocal Runner] Running phase "install"')
+          expect(@errstream.string).to include('[BuildSpecRunner Runner] Running phase "install"')
           expect(@outstream.string).to include('ran install')
           expect(@outstream.string).not_to eq("SHOULDNT SEE THIS PHASE")
-          expect(@errstream.string).not_to include('[CodeBuildLocal Runner] Running phase "pre_build"')
-          expect(@errstream.string).not_to include('[CodeBuildLocal Runner] Running phase "build"')
-          expect(@errstream.string).not_to include('[CodeBuildLocal Runner] Running phase "post_build"')
+          expect(@errstream.string).not_to include('[BuildSpecRunner Runner] Running phase "pre_build"')
+          expect(@errstream.string).not_to include('[BuildSpecRunner Runner] Running phase "build"')
+          expect(@errstream.string).not_to include('[BuildSpecRunner Runner] Running phase "post_build"')
         end
       end
 
@@ -358,7 +356,7 @@ RSpec.describe Runner do
 
         it "Runs install and pre_build" do
           ['install', 'pre_build'].each do |phase|
-            expect(@errstream.string).to include("[CodeBuildLocal Runner] Running phase \"#{phase}\"")
+            expect(@errstream.string).to include("[BuildSpecRunner Runner] Running phase \"#{phase}\"")
             expect(@outstream.string).to include("ran #{phase}")
           end
           expect(@outstream.string).not_to eq("SHOULDNT SEE THIS PHASE")
@@ -380,8 +378,8 @@ RSpec.describe Runner do
         end
 
         it "Runs all phases" do
-          CodeBuildLocal::BuildSpec::PHASES.each do |phase|
-            expect(@errstream.string).to include("[CodeBuildLocal Runner] Running phase \"#{phase}\"")
+          BuildSpecRunner::BuildSpec::PHASES.each do |phase|
+            expect(@errstream.string).to include("[BuildSpecRunner Runner] Running phase \"#{phase}\"")
             expect(@outstream.string).to include("ran #{phase}")
           end
         end
@@ -402,8 +400,8 @@ RSpec.describe Runner do
         end
 
         it "Runs all phases" do
-          CodeBuildLocal::BuildSpec::PHASES.each do |phase|
-            expect(@errstream.string).to include("[CodeBuildLocal Runner] Running phase \"#{phase}\"")
+          BuildSpecRunner::BuildSpec::PHASES.each do |phase|
+            expect(@errstream.string).to include("[BuildSpecRunner Runner] Running phase \"#{phase}\"")
             expect(@outstream.string).to include("ran #{phase}")
           end
         end

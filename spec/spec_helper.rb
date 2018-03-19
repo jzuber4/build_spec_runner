@@ -1,5 +1,5 @@
 require "bundler/setup"
-require "code_build_local"
+require "build_spec_runner"
 
 RSpec.configure do |config|
   # Enable flags like --only-failures and --next-failure

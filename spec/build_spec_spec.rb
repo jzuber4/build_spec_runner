@@ -1,9 +1,9 @@
 require 'build_spec_helper'
 require 'spec_helper'
 
-PHASES = CodeBuildLocal::BuildSpec::PHASES
-BuildSpec = CodeBuildLocal::BuildSpec::BuildSpec
-BuildSpecError = CodeBuildLocal::BuildSpec::BuildSpecError
+PHASES = BuildSpecRunner::BuildSpec::PHASES
+BuildSpec = BuildSpecRunner::BuildSpec::BuildSpec
+BuildSpecError = BuildSpecRunner::BuildSpec::BuildSpecError
 
 RSpec.describe BuildSpec do
 
